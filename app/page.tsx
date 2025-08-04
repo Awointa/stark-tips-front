@@ -14,7 +14,7 @@ export default function HomePage() {
               <Coins className="h-12 w-12 text-purple-600" />
             </div>
           </div>
-          <h1 className="text-5xl font-bold text-gray-900 mb-6">Thanksonchain</h1>
+          <h1 className="text-5xl font-bold text-gray-900 mb-6">StarkTips</h1>
           <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
             The simplest way for creators to receive tips on Starknet. Share your link and start earning in minutes.
           </p>
