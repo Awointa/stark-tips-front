@@ -5,12 +5,14 @@ import "./globals.css"
 import { Toaster } from "@/components/ui/sonner"
 import Link from "next/link"
 import { Coins } from "lucide-react"
+import { StarknetProvider } from "@/components/starknet-provider";
+
 
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Thanksonchain - Starknet Creator Tipping Platform",
-  description: "The simplest way for creators to receive tips on Starknet with Thanksonchain",
+  title: "StarkTips - Starknet Creator Tipping Platform",
+  description: "The simplest way for creators to receive tips on Starknet with Starktips",
 }
 
 export default function RootLayout({
@@ -26,7 +28,7 @@ export default function RootLayout({
             <div className="flex items-center justify-between">
               <Link href="/" className="flex items-center gap-2 font-bold text-xl">
                 <Coins className="h-6 w-6 text-purple-600" />
-                Thanksonchain
+                StarkTips
               </Link>
               <div className="flex items-center gap-4">
                 <Link href="/demo" className="text-gray-600 hover:text-gray-900">
@@ -39,7 +41,9 @@ export default function RootLayout({
             </div>
           </div>
         </nav>
+        <StarknetProvider>
         {children}
+        </StarknetProvider>
         <Toaster />
       </body>
     </html>
