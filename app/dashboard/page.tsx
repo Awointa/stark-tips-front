@@ -13,6 +13,10 @@ import { useToast } from "@/hooks/use-toast"
 import WalletConnect from "@/components/wallet-connect"
 import Link from "next/link"
 
+import {MY_CONTRACT_ABI} from "@/constants/abi/MyContract";
+import {CONTRACT_ADDRESS} from "@/constants";
+import { useContract } from "@starknet-react/core";
+
 interface TipPage {
   id: string
   name: string
@@ -30,6 +34,13 @@ export default function Dashboard() {
   const [goal, setGoal] = useState("")
   const [isCreating, setIsCreating] = useState(false)
   const [activeTab, setActiveTab] = useState("overview")
+
+    // Create contract instance
+    const { contract } = useContract({
+      abi: MY_CONTRACT_ABI,
+      address: CONTRACT_ADDRESS,
+    });
+  
 
   const [tipPages, setTipPages] = useState<TipPage[]>([
     {
