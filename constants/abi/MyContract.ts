@@ -1,5 +1,4 @@
-export const StoreAbi = [
-    [
+export const MY_CONTRACT_ABI = [
     {
       "type": "function",
       "name": "pause",
@@ -913,5 +912,4 @@ export const StoreAbi = [
         }
       ]
     }
-  ]
-];
+  ] as const;
