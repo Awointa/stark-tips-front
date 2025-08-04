@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -23,6 +23,7 @@ import {
 import { useToast } from "@/hooks/use-toast"
 import WalletConnect from "@/components/wallet-connect"
 import Link from "next/link"
+import { useAccount } from "@starknet-react/core";
 
 interface TipPageProps {
   params: {
@@ -50,6 +51,7 @@ interface PageData {
 }
 
 export default function TipPage({ params }: TipPageProps) {
+  const { address, status } = useAccount(); 
   const [customAmount, setCustomAmount] = useState("")
   const [message, setMessage] = useState("")
   const [selectedAmount, setSelectedAmount] = useState<string | null>(null)
@@ -57,6 +59,14 @@ export default function TipPage({ params }: TipPageProps) {
   const [isConnected, setIsConnected] = useState(false)
   const [transactionStatus, setTransactionStatus] = useState<"idle" | "pending" | "success" | "error">("idle")
   const [txHash, setTxHash] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (status === "disconnected") {
+      setIsConnected(false)
+    } else if (status === "connected") {
+      setIsConnected(true)
+    }
+  }, [address, status])
 
   const [pageData, setPageData] = useState<PageData>({
     creatorName: "Creative Artist",
@@ -185,7 +195,7 @@ export default function TipPage({ params }: TipPageProps) {
 
   const shareLink = () => {
     const url = `${window.location.origin}/tip/${params.pageId}`
-    const text = `Support ${pageData.creatorName} on Thanksonchain! 💜`
+    const text = `Support ${pageData.creatorName} on StarkTips! 💜`
 
     if (navigator.share) {
       navigator.share({
@@ -239,7 +249,7 @@ export default function TipPage({ params }: TipPageProps) {
               <Link href="/">
                 <Button variant="ghost" size="sm">
                   <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back to Thanksonchain
+                  Back to StarkTips
                 </Button>
               </Link>
               <div className="h-6 w-px bg-gray-300" />
@@ -276,7 +286,7 @@ export default function TipPage({ params }: TipPageProps) {
                       <div className="flex items-center gap-4 text-sm text-gray-600 mb-3">
                         <span className="flex items-center gap-1">
                           <Heart className="h-4 w-4 text-red-500" />
-                          {pageData.totalAmount} ETH raised
+                          {pageData.totalAmount} STRK raised
                         </span>
                         <span className="flex items-center gap-1">
                           <Users className="h-4 w-4 text-blue-500" />
@@ -291,7 +301,7 @@ export default function TipPage({ params }: TipPageProps) {
                           </div>
                           <Progress value={progressPercentage} className="h-2" />
                           <p className="text-xs text-gray-500">
-                            {pageData.totalAmount} ETH of {pageData.goal} ETH goal
+                            {pageData.totalAmount} STRK of {pageData.goal} STRK goal
                           </p>
                         </div>
                       )}
@@ -370,7 +380,7 @@ export default function TipPage({ params }: TipPageProps) {
                           disabled={isSending}
                         >
                           <div className="text-lg">{amount.emoji}</div>
-                          <div className="font-semibold">{amount.eth} ETH</div>
+                          <div className="font-semibold">{amount.eth} STRK</div>
                           <div className="text-xs opacity-70">${getAmountInUSD(amount.eth)}</div>
                           <div className="text-xs opacity-60">{amount.label}</div>
                         </Button>
@@ -380,7 +390,7 @@ export default function TipPage({ params }: TipPageProps) {
 
                   {/* Custom Amount */}
                   <div className="space-y-2">
-                    <Label htmlFor="customAmount">Custom Amount (ETH)</Label>
+                    <Label htmlFor="customAmount">Custom Amount (STRK)</Label>
                     <div className="relative">
                       <Input
                         id="customAmount"

@@ -1,9 +1,10 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Wallet, CheckCircle, AlertCircle, ChevronRight } from "lucide-react"
+import { Wallet, CheckCircle, AlertCircle, Loader2} from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -12,52 +13,58 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Loader2 } from "lucide-react"
+import {ready, braavos, useInjectedConnectors, useAccount, useConnect, useDisconnect} from "@starknet-react/core"
 
 interface WalletConnectProps {
   onConnectionChange?: (connected: boolean) => void
 }
 
 export default function WalletConnect({ onConnectionChange }: WalletConnectProps) {
-  const [isConnected, setIsConnected] = useState(false)
-  const [isConnecting, setIsConnecting] = useState(false)
-  const [walletAddress, setWalletAddress] = useState("")
-  const [walletType, setWalletType] = useState<"ArgentX" | "Braavos" | null>(null)
+  const { connectors } = useInjectedConnectors({
+    recommended: [ready(), braavos()],
+    // Hide recommended connectors if the user has any connector installed.
+    includeRecommended: "always",
+    // Randomize the order of the connectors.
+    order: "random",
+  });
+  
+  const {address, isConnected, connector: activeConnector} = useAccount();
+  const {connect, isPending: isConnecting, error} = useConnect();
+  const {disconnect} = useDisconnect();
   const [connectionError, setConnectionError] = useState<string | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
 
   useEffect(() => {
-    onConnectionChange?.(isConnected)
+    onConnectionChange?.(!!isConnected)
   }, [isConnected, onConnectionChange])
 
-  const connectWallet = async (type: "ArgentX" | "Braavos") => {
-    setIsConnecting(true)
+  // Handle connection errors from useConnect hook
+  useEffect(() => {
+    if (error) {
+      setConnectionError(error.message || "Failed to connect wallet")
+      setIsModalOpen(true) // Reopen modal on error
+    }
+  }, [error])
+
+  const connectWallet = async (connector: any) => {
     setConnectionError(null)
     setIsModalOpen(false) // Close modal once a wallet is selected
 
     try {
-      // Simulate wallet detection and connection
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-
-      // Simulate connection success
-      setIsConnected(true)
-      setWalletAddress("0x1234567890abcdef1234567890abcdef12345678")
-      setWalletType(type)
+      // Pass the connector object to connect
+      connect({ connector });
     } catch (error) {
-      setConnectionError(`Failed to connect to ${type}. Please ensure it's installed and unlocked.`)
-    } finally {
-      setIsConnecting(false)
-    }
+      setConnectionError(`Failed to connect to ${connector.name}. Please ensure it's installed and unlocked.`)
+    } 
   }
 
   const disconnectWallet = () => {
-    setIsConnected(false)
-    setWalletAddress("")
-    setWalletType(null)
-    setConnectionError(null)
+    disconnect()
   }
 
-  if (connectionError) {
+  // Handle both local error state and useConnect error
+  const displayError = connectionError || error?.message
+  if (displayError) {
     return (
       <Card className="border-red-200 bg-red-50">
         <CardContent className="p-4">
@@ -65,7 +72,7 @@ export default function WalletConnect({ onConnectionChange }: WalletConnectProps
             <AlertCircle className="h-5 w-5 text-red-600" />
             <div className="flex-1">
               <p className="font-medium text-red-800">Connection Failed</p>
-              <p className="text-sm text-red-600">{connectionError}</p>
+              <p className="text-sm text-red-600">{displayError}</p>
             </div>
             <Button
               variant="outline"
@@ -84,7 +91,7 @@ export default function WalletConnect({ onConnectionChange }: WalletConnectProps
     )
   }
 
-  if (isConnected) {
+  if (isConnected && address) {
     return (
       <Card className="border-green-200 bg-green-50">
         <CardContent className="p-4">
@@ -92,9 +99,9 @@ export default function WalletConnect({ onConnectionChange }: WalletConnectProps
             <div className="flex items-center gap-3">
               <CheckCircle className="h-5 w-5 text-green-600" />
               <div>
-                <p className="font-medium text-green-800">{walletType} Connected</p>
+                <p className="font-medium text-green-800">{activeConnector?.name} Connected</p>
                 <p className="text-sm text-green-600 font-mono">
-                  {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
+                  {address.slice(0, 6)}...{address.slice(-4)}
                 </p>
               </div>
             </div>
@@ -115,7 +122,7 @@ export default function WalletConnect({ onConnectionChange }: WalletConnectProps
   return (
     <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
       <DialogTrigger asChild>
-        <Card className="border-orange-200 bg-orange-50">
+        <Card className="border-orange-200 bg-orange-50 cursor-pointer hover:bg-orange-100 transition-colors">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -138,33 +145,39 @@ export default function WalletConnect({ onConnectionChange }: WalletConnectProps
           <DialogDescription>Choose your preferred Starknet wallet to connect to Thanksonchain.</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
-          <Button
-            variant="outline"
-            className="w-full justify-between h-14 text-lg bg-transparent"
-            onClick={() => connectWallet("ArgentX")}
-            disabled={isConnecting}
-          >
-            <div className="flex items-center gap-3">
-              {/* Replace with actual ArgentX icon */}
-              <img src="/placeholder.svg?height=24&width=24" alt="ArgentX" className="h-6 w-6" />
-              ArgentX
+          {connectors.length > 0 ? (
+            connectors.map(connector => (
+              <Button
+                key={connector.id}
+                variant="outline"
+                className="w-full justify-between h-14 text-lg bg-transparent hover:bg-gray-50"
+                onClick={() => connectWallet(connector)}
+                disabled={isConnecting}
+              >
+                <div className="flex items-center gap-3">
+                  {connector.icon && (
+                    <img 
+                      src={typeof connector.icon === "string" ? connector.icon : connector.icon.light} 
+                      alt={connector.name}
+                      className="h-6 w-6"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none'
+                      }}
+                    />
+                  )}
+                  {connector.name}
+                </div>
+              </Button>
+            ))
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              <Wallet className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p className="font-medium mb-2">No Starknet wallets detected</p>
+              <p className="text-sm">
+                Please install a Starknet wallet like Ready (ArgentX) or Braavos to continue.
+              </p>
             </div>
-            <ChevronRight className="h-5 w-5" />
-          </Button>
-          <Button
-            variant="outline"
-            className="w-full justify-between h-14 text-lg bg-transparent"
-            onClick={() => connectWallet("Braavos")}
-            disabled={isConnecting}
-          >
-            <div className="flex items-center gap-3">
-              {/* Replace with actual Braavos icon */}
-              <img src="/placeholder.svg?height=24&width=24" alt="Braavos" className="h-6 w-6" />
-              Braavos
-            </div>
-            <ChevronRight className="h-5 w-5" />
-          </Button>
-          {/* Add more wallet options here */}
+          )}
         </div>
         {isConnecting && (
           <div className="flex items-center justify-center text-sm text-gray-500">
