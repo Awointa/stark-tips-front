@@ -16,6 +16,7 @@ import {MY_CONTRACT_ABI} from "@/constants/abi/MyContract";
 import {CONTRACT_ADDRESS} from "@/constants";
 import { useAccount, useContract, useReadContract } from "@starknet-react/core";
 
+
 interface TipPage {
   id: string
   name: string
@@ -154,6 +155,8 @@ export default function Dashboard() {
         description: "Failed to fetch page details from contract",
         variant: "destructive",
       });
+    } finally{
+      setIsLoading(false)
     }
   }, [contract, totalPagesData, toast]);
 
@@ -513,10 +516,10 @@ export default function Dashboard() {
             <MyPages tipPages={tipPages} setActiveTab={setActiveTab} copyLink={copyLink} shareLink={shareLink} togglePageStatus={togglePageStatus}/>
 
             {/* Analytics Tab */}
-            <Analytics tipPages={tipPages} contractStats={contractStats}/>
+            <Analytics contractAddress={CONTRACT_ADDRESS} creatorAddress={account?.address}/>
 
             {/* Create New Tab */}
-            <CreateNewPage pageName={pageName} setPageName={setPageName} description={description} setDescription={setDescription} goal={goal} setGoal={setGoal} handleCreatePage={handleCreatePage} isCreating={isCreating} />
+            <CreateNewPage pageName={pageName} setPageName={setPageName} description={description} setDescription={setDescription} goal={goal} setGoal={setGoal}/>
           </Tabs>
         </div>
       </div>
