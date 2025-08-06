@@ -1,21 +1,20 @@
 "use client"
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
+import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Copy, Plus, BarChart3, Eye, Settings, TrendingUp, Users, DollarSign, Calendar, Share2 } from "lucide-react"
+import {Eye,TrendingUp, Users, DollarSign,  } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { Button } from "@/components/ui/button"
 import WalletConnect from "@/components/wallet-connect"
-import Link from "next/link"
+import MyPages from "@/components/MyPages"
+import Analytics from "@/components/Analytics"
+import CreateNewPage from "@/components/CreateNewPage"
 
 import {MY_CONTRACT_ABI} from "@/constants/abi/MyContract";
 import {CONTRACT_ADDRESS} from "@/constants";
-import { useContract } from "@starknet-react/core";
+import { useAccount, useContract, useReadContract } from "@starknet-react/core";
 
 interface TipPage {
   id: string
@@ -28,12 +27,32 @@ interface TipPage {
   goal?: string
 }
 
+interface ContractStats {
+  totalPages: bigint | undefined
+  totalTips: number
+  totalAmount: number
+  activePagesCount: number
+  averageTip: number
+}
+
 export default function Dashboard() {
   const [pageName, setPageName] = useState("")
   const [description, setDescription] = useState("")
   const [goal, setGoal] = useState("")
   const [isCreating, setIsCreating] = useState(false)
   const [activeTab, setActiveTab] = useState("overview")
+  const [userPages, setUserPages] = useState<bigint[]>([])
+  const [contractStats, setContractStats] = useState<ContractStats>({
+    totalPages: undefined,
+    totalTips: 0,
+    totalAmount: 0,
+    activePagesCount: 0,
+    averageTip: 0,
+  })
+  const [isLoading, setIsLoading] = useState(false)
+
+  const {account} = useAccount()
+  const {toast} = useToast()
 
     // Create contract instance
     const { contract } = useContract({
@@ -41,6 +60,143 @@ export default function Dashboard() {
       address: CONTRACT_ADDRESS,
     });
   
+    // Read user's pages from contract 
+    const {data: totalPagesData} = useReadContract({
+      functionName: "get_total_pages",
+      abi: MY_CONTRACT_ABI,
+      address: CONTRACT_ADDRESS,
+    })
+    console.log(totalPagesData)
+
+    // Read user's pages from contract 
+    const {data: creatorPagesData} = useReadContract({
+      functionName: "get_creator_pages",
+      abi: MY_CONTRACT_ABI,
+      address: CONTRACT_ADDRESS,
+      args: account?.address ? [account.address] : undefined,
+      enabled: !!account?.address,
+    })
+    console.log(creatorPagesData)
+
+  // Fetch page details for each user page
+  const fetchPageDetails = useCallback(async (pageIds: bigint[]) => {
+    if (!contract || pageIds.length == 0) return;
+
+    setIsLoading(true);
+
+    try {
+      const pagePromises = pageIds.map(async (pageId) => {
+        try {
+          const pageInfo = await contract.get_page_info(pageId);
+          const pageTips = await contract.get_tips_for_page(pageId);
+          
+          return {
+            id: pageId.toString(),
+            pageInfo,
+            tips: pageTips || []
+          };
+        } catch (error) {
+          console.error(`Error fetching page ${pageId}:`, error);
+          return null;
+        }
+      });
+
+      const pageDetails = await Promise.all(pagePromises);
+      const validPages = pageDetails.filter(page => page !== null);
+      
+      // Calculate stats from contract data
+      let totalTips = 0;
+      let totalAmount = 0;
+      let activePagesCount = 0;
+
+      validPages.forEach(page => {
+        if (page?.pageInfo) {
+          // Convert BigInt to number for calculations (be careful with large numbers)
+          const pageAmount = Number(page.pageInfo.total_amount_recieved) / Math.pow(10, 18); // Assuming 18 decimals for STRK
+          const pageTipsCount = Number(page.pageInfo.total_tips_recieved);
+          
+          totalAmount += pageAmount;
+          totalTips += pageTipsCount;
+          
+          if (page.pageInfo.is_active) {
+            activePagesCount++;
+          }
+        }
+      });
+
+      const averageTip = totalTips > 0 ? totalAmount / totalTips : 0;
+
+      setContractStats({
+        totalPages: totalPagesData as bigint,
+        totalTips,
+        totalAmount,
+        activePagesCount,
+        averageTip
+      });
+
+      // Update tip pages state with real data
+      const updatedPages: TipPage[] = validPages.map(page => ({
+        id: page!.id,
+        name: page!.pageInfo.name.toString(), // Convert ByteArray to string
+        description: page!.pageInfo.description.toString(),
+        totalAmount: (Number(page!.pageInfo.total_amount_recieved) / Math.pow(10, 18)).toFixed(6),
+        tipCount: Number(page!.pageInfo.total_tips_recieved),
+        createdAt: new Date(Number(page!.pageInfo.created_at) * 1000).toISOString().split("T")[0],
+        isActive: page!.pageInfo.is_active,
+      }));
+
+      setTipPages(updatedPages);
+
+    } catch (error) {
+      console.error("Error fetching page details:", error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch page details from contract",
+        variant: "destructive",
+      });
+    }
+  }, [contract, totalPagesData, toast]);
+
+  // Reset data when wallet disconnects
+  useEffect(() => {
+    if (!account) {
+      setUserPages([]);
+      setTipPages([]);
+      setContractStats({
+        totalPages: undefined,
+        totalTips: 0,
+        totalAmount: 0,
+        activePagesCount: 0,
+        averageTip: 0
+      });
+    }
+  }, [account]);
+
+  // Effect to fetch user pages when account changes
+  useEffect(() => {
+    if (creatorPagesData && Array.isArray(creatorPagesData)) {
+      setUserPages(creatorPagesData as bigint[]);
+    }
+  }, [creatorPagesData]);
+
+  // Effect to fetch page details when user pages change
+  useEffect(() => {
+    if (userPages.length > 0 && account) {
+      fetchPageDetails(userPages);
+    } else if (account && userPages.length === 0) {
+      // Account connected but no pages found - clear the loading state
+      setTipPages([]);
+      setContractStats(prev => ({
+        ...prev,
+        totalPages: totalPagesData as bigint,
+        totalTips: 0,
+        totalAmount: 0,
+        activePagesCount: 0,
+        averageTip: 0
+      }));
+    }
+  }, [userPages, account, fetchPageDetails, totalPagesData]);
+
 
   const [tipPages, setTipPages] = useState<TipPage[]>([
     {
@@ -74,8 +230,6 @@ export default function Dashboard() {
     },
   ])
 
-  const { toast } = useToast()
-
   const handleCreatePage = async () => {
     if (!pageName.trim()) {
       toast({
@@ -86,33 +240,53 @@ export default function Dashboard() {
       return
     }
 
-    setIsCreating(true)
+    if (!account || !contract) {
+      toast({
+        title: "Error",
+        description: "Please connect your wallet",
+        variant: "destructive",
+      })
+      return
+    }
 
-    // Simulate contract interaction
-    setTimeout(() => {
-      const newPage: TipPage = {
-        id: Math.random().toString(36).substring(2, 15),
-        name: pageName,
-        description: description || "Support my work!",
-        totalAmount: "0",
-        tipCount: 0,
-        createdAt: new Date().toISOString().split("T")[0],
-        isActive: true,
-        goal: goal || undefined,
+    setIsCreating(true)
+      try {
+        // Call the contract to create a tip page
+        const result = await contract.create_tip_page(
+          account.address,
+          pageName,
+          description || "Support my work!"
+        );
+
+        // Wait for transaction to complete
+        await account.waitForTransaction(result.transaction_hash);
+
+        // Refresh the page data
+        const updatedPages = await contract.get_creator_pages(account.address);
+        setUserPages(updatedPages as bigint[]);
+
+        setPageName("")
+        setDescription("")
+        setGoal("")
+
+        toast({
+          title: "Success! 🎉",
+          description: "Your tip page has been created and is ready to receive tips",
+        })
+
+      } catch (error) {
+        console.error("Error creating tip page:", error);
+        toast({
+          title: "Error",
+          description: "Failed to create tip page. Please try again.",
+          variant: "destructive",
+        })
+      } finally {
+        setIsCreating(false)
       }
 
-      setTipPages((prev) => [newPage, ...prev])
-      setPageName("")
-      setDescription("")
-      setGoal("")
-      setIsCreating(false)
 
-      toast({
-        title: "Success! 🎉",
-        description: "Your tip page has been created and is ready to receive tips",
-      })
-    }, 2000)
-  }
+    }
 
   const copyLink = (pageId: string) => {
     const link = `${window.location.origin}/tip/${pageId}`
@@ -142,17 +316,49 @@ export default function Dashboard() {
     }
   }
 
-  const togglePageStatus = (pageId: string) => {
-    setTipPages((prev) => prev.map((page) => (page.id === pageId ? { ...page, isActive: !page.isActive } : page)))
-    toast({
-      title: "Page Updated",
-      description: "Page status has been changed",
-    })
+  const togglePageStatus = async (pageId: string) => {
+    if(!account || !contract) {
+      toast({
+        title: "Error",
+        description: "Please connect your wallet",
+        variant: "destructive",
+      })
+      return
+    }
+
+     try {
+      const page = tipPages.find(p => p.id === pageId);
+      
+      if (page?.isActive) {
+        await contract.deactivate_page(BigInt(pageId));
+      } else {
+        await contract.activate_page(BigInt(pageId));
+      }
+
+      // Refresh data after status change
+      fetchPageDetails(userPages);
+
+      toast({
+        title: "Page Updated",
+        description: "Page status has been changed",
+      })
+    } catch (error) {
+      console.error("Error toggling page status:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update page status",
+        variant: "destructive",
+      })
+    }
   }
 
-  const totalEarnings = tipPages.reduce((sum, page) => sum + Number.parseFloat(page.totalAmount), 0)
-  const totalTips = tipPages.reduce((sum, page) => sum + page.tipCount, 0)
-  const activePagesCount = tipPages.filter((page) => page.isActive).length
+ 
+    // Use contract stats for calculations
+  const totalEarnings = contractStats.totalAmount;
+  const totalTips = contractStats.totalTips;
+  const activePagesCount = contractStats.activePagesCount;
+  const averageTip = contractStats.averageTip;
+
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -160,10 +366,20 @@ export default function Dashboard() {
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Creator Dashboard</h1>
-            <p className="text-gray-600">Manage your tip pages and track your earnings on Thanksonchain</p>
+            <p className="text-gray-600">Manage your tip pages and track your earnings on StarkTips</p>
           </div>
 
           <WalletConnect />
+
+          {!account && (
+            <Card className="mt-8 bg-yellow-50 border-yellow-200">
+              <CardContent className="pt-6">
+                <p className="text-center text-yellow-800">
+                  Please connect your wallet to view your dashboard and manage tip pages
+                </p>
+              </CardContent>
+            </Card>
+          )}
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-8">
             <TabsList className="grid w-full grid-cols-4">
@@ -183,7 +399,7 @@ export default function Dashboard() {
                     <DollarSign className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">{totalEarnings.toFixed(3)} ETH</div>
+                    <div className="text-2xl font-bold">{totalEarnings.toFixed(3)} STRK</div>
                     <p className="text-xs text-muted-foreground">≈ ${(totalEarnings * 2000).toFixed(2)} USD</p>
                   </CardContent>
                 </Card>
@@ -206,7 +422,7 @@ export default function Dashboard() {
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold">{activePagesCount}</div>
-                    <p className="text-xs text-muted-foreground">Out of {tipPages.length} total</p>
+                    <p className="text-xs text-muted-foreground">Out of {/*totalPages*/} total</p>
                   </CardContent>
                 </Card>
 
@@ -217,12 +433,41 @@ export default function Dashboard() {
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold">
-                      {totalTips > 0 ? (totalEarnings / totalTips).toFixed(3) : "0.000"} ETH
+                      {totalTips > 0 ? (totalEarnings / totalTips).toFixed(3) : "0.000"} STRK
                     </div>
                     <p className="text-xs text-muted-foreground">Per tip received</p>
                   </CardContent>
                 </Card>
               </div>
+              
+               {/* Loading state */}
+               {account && isLoading && (
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="text-center text-gray-500">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto mb-2"></div>
+                      <p>Loading your tip pages from the blockchain...</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* No data state */}
+              {account && !isLoading && tipPages.length === 0 && (
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="text-center text-gray-500">
+                      <p>You haven't created any tip pages yet.</p>
+                      <Button 
+                        onClick={() => setActiveTab("create")} 
+                        className="mt-4 bg-purple-600 hover:bg-purple-700"
+                      >
+                        Create Your First Page
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Recent Activity */}
               <Card>
@@ -236,9 +481,9 @@ export default function Dashboard() {
                       <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                       <div className="flex-1">
                         <p className="text-sm font-medium">New tip received</p>
-                        <p className="text-xs text-gray-500">0.1 ETH on "My Creative Journey" • 2 hours ago</p>
+                        <p className="text-xs text-gray-500">0.1 STRK on "My Creative Journey" • 2 hours ago</p>
                       </div>
-                      <Badge variant="secondary">+0.1 ETH</Badge>
+                      <Badge variant="secondary">+0.1 STRK</Badge>
                     </div>
 
                     <div className="flex items-center gap-4 p-3 bg-blue-50 rounded-lg">
@@ -265,321 +510,13 @@ export default function Dashboard() {
             </TabsContent>
 
             {/* My Pages Tab */}
-            <TabsContent value="pages" className="space-y-6">
-              <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold">My Tip Pages</h2>
-                <Button onClick={() => setActiveTab("create")} className="bg-purple-600 hover:bg-purple-700">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create New Page
-                </Button>
-              </div>
-
-              <div className="grid gap-6">
-                {tipPages.map((page) => (
-                  <Card key={page.id} className={`${!page.isActive ? "opacity-60" : ""}`}>
-                    <CardHeader>
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <CardTitle className="text-xl">{page.name}</CardTitle>
-                            <Badge variant={page.isActive ? "default" : "secondary"}>
-                              {page.isActive ? "Active" : "Inactive"}
-                            </Badge>
-                          </div>
-                          <CardDescription className="mb-3">{page.description}</CardDescription>
-                          <div className="flex items-center gap-4 text-sm text-gray-600">
-                            <span>{page.totalAmount} ETH raised</span>
-                            <span>{page.tipCount} tips</span>
-                            <span>Created {new Date(page.createdAt).toLocaleDateString()}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex flex-wrap gap-2">
-                        <Button variant="outline" size="sm" asChild>
-                          <Link href={`/tip/${page.id}`}>
-                            <Eye className="h-4 w-4 mr-2" />
-                            View Page
-                          </Link>
-                        </Button>
-
-                        <Button variant="outline" size="sm" onClick={() => copyLink(page.id)}>
-                          <Copy className="h-4 w-4 mr-2" />
-                          Copy Link
-                        </Button>
-
-                        <Button variant="outline" size="sm" onClick={() => shareLink(page.id, page.name)}>
-                          <Share2 className="h-4 w-4 mr-2" />
-                          Share
-                        </Button>
-
-                        <Button variant="outline" size="sm" onClick={() => setActiveTab("analytics")}>
-                          <BarChart3 className="h-4 w-4 mr-2" />
-                          Analytics
-                        </Button>
-
-                        <Button variant="outline" size="sm" onClick={() => togglePageStatus(page.id)}>
-                          <Settings className="h-4 w-4 mr-2" />
-                          {page.isActive ? "Deactivate" : "Activate"}
-                        </Button>
-                      </div>
-
-                      {page.goal && (
-                        <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                          <div className="flex justify-between text-sm mb-2">
-                            <span>Goal Progress</span>
-                            <span>
-                              {((Number.parseFloat(page.totalAmount) / Number.parseFloat(page.goal)) * 100).toFixed(1)}%
-                            </span>
-                          </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div
-                              className="bg-purple-600 h-2 rounded-full"
-                              style={{
-                                width: `${Math.min((Number.parseFloat(page.totalAmount) / Number.parseFloat(page.goal)) * 100, 100)}%`,
-                              }}
-                            ></div>
-                          </div>
-                          <p className="text-xs text-gray-500 mt-1">
-                            {page.totalAmount} ETH of {page.goal} ETH goal
-                          </p>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </TabsContent>
+            <MyPages tipPages={tipPages} setActiveTab={setActiveTab} copyLink={copyLink} shareLink={shareLink} togglePageStatus={togglePageStatus}/>
 
             {/* Analytics Tab */}
-            <TabsContent value="analytics" className="space-y-6">
-              <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold">Analytics Dashboard</h2>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm">
-                    <Calendar className="h-4 w-4 mr-2" />
-                    Last 30 Days
-                  </Button>
-                  <Button variant="outline" size="sm">
-                    Export Data
-                  </Button>
-                </div>
-              </div>
-
-              {/* Analytics Cards */}
-              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium">This Month</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-green-600">+0.8 ETH</div>
-                    <p className="text-xs text-muted-foreground">↗️ +23% from last month</p>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium">New Supporters</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-blue-600">12</div>
-                    <p className="text-xs text-muted-foreground">↗️ +4 from last month</p>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium">Best Performing Page</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-sm font-bold">My Creative Journey</div>
-                    <p className="text-xs text-muted-foreground">2.45 ETH total</p>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium">Peak Tip Day</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-sm font-bold">Yesterday</div>
-                    <p className="text-xs text-muted-foreground">0.3 ETH in tips</p>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Detailed Analytics */}
-              <div className="grid lg:grid-cols-2 gap-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Tips Over Time</CardTitle>
-                    <CardDescription>Your tip earnings trend</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
-                      <div className="text-center text-gray-500">
-                        <BarChart3 className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                        <p>Chart visualization would go here</p>
-                        <p className="text-sm">Showing earnings over the last 30 days</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Top Supporters</CardTitle>
-                    <CardDescription>Your most generous supporters</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <p className="font-medium">0x1234...5678</p>
-                          <p className="text-sm text-gray-500">3 tips</p>
-                        </div>
-                        <Badge variant="secondary">0.3 ETH</Badge>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <p className="font-medium">0x9876...4321</p>
-                          <p className="text-sm text-gray-500">2 tips</p>
-                        </div>
-                        <Badge variant="secondary">0.25 ETH</Badge>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <p className="font-medium">0x5555...7777</p>
-                          <p className="text-sm text-gray-500">1 tip</p>
-                        </div>
-                        <Badge variant="secondary">0.2 ETH</Badge>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Page Performance */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Page Performance</CardTitle>
-                  <CardDescription>How each of your tip pages is performing</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {tipPages.map((page) => (
-                      <div key={page.id} className="flex items-center justify-between p-4 border rounded-lg">
-                        <div className="flex-1">
-                          <h4 className="font-medium">{page.name}</h4>
-                          <div className="flex items-center gap-4 text-sm text-gray-500 mt-1">
-                            <span>{page.tipCount} tips</span>
-                            <span>{page.totalAmount} ETH</span>
-                            <span>
-                              Avg:{" "}
-                              {page.tipCount > 0
-                                ? (Number.parseFloat(page.totalAmount) / page.tipCount).toFixed(3)
-                                : "0.000"}{" "}
-                              ETH
-                            </span>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-lg font-bold">{page.totalAmount} ETH</div>
-                          <Badge variant={page.isActive ? "default" : "secondary"}>
-                            {page.isActive ? "Active" : "Inactive"}
-                          </Badge>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
+            <Analytics tipPages={tipPages} contractStats={contractStats}/>
 
             {/* Create New Tab */}
-            <TabsContent value="create" className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Plus className="h-5 w-5" />
-                    Create New Tip Page
-                  </CardTitle>
-                  <CardDescription>Set up a new tip page to start receiving support from your audience</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="pageName">Page Name *</Label>
-                    <Input
-                      id="pageName"
-                      placeholder="e.g., Support My Art, Coffee Fund, Music Production"
-                      value={pageName}
-                      onChange={(e) => setPageName(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="description">Description</Label>
-                    <Textarea
-                      id="description"
-                      placeholder="Tell your supporters what you're working on and how their tips will help..."
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      rows={4}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="goal">Goal (Optional)</Label>
-                    <Input
-                      id="goal"
-                      type="number"
-                      step="0.1"
-                      placeholder="e.g., 5.0"
-                      value={goal}
-                      onChange={(e) => setGoal(e.target.value)}
-                    />
-                    <p className="text-sm text-gray-500">
-                      Set a fundraising goal in ETH to show progress to supporters
-                    </p>
-                  </div>
-
-                  <Button
-                    onClick={handleCreatePage}
-                    disabled={isCreating}
-                    className="w-full bg-purple-600 hover:bg-purple-700"
-                    size="lg"
-                  >
-                    {isCreating ? "Creating Your Page..." : "Create Tip Page"}
-                  </Button>
-                </CardContent>
-              </Card>
-
-              {/* Tips for Success */}
-              <Card className="bg-blue-50 border-blue-200">
-                <CardHeader>
-                  <CardTitle className="text-blue-900">💡 Tips for Success</CardTitle>
-                </CardHeader>
-                <CardContent className="text-blue-800 space-y-2 text-sm">
-                  <p>
-                    ✅ <strong>Clear page name:</strong> Make it obvious what you're raising funds for
-                  </p>
-                  <p>
-                    ✅ <strong>Compelling description:</strong> Explain your project and how tips help
-                  </p>
-                  <p>
-                    ✅ <strong>Set realistic goals:</strong> Start with achievable targets to build momentum
-                  </p>
-                  <p>
-                    ✅ <strong>Share regularly:</strong> Post your link on social media, Discord, etc.
-                  </p>
-                  <p>
-                    ✅ <strong>Thank supporters:</strong> Acknowledge tips to encourage more support
-                  </p>
-                </CardContent>
-              </Card>
-            </TabsContent>
+            <CreateNewPage pageName={pageName} setPageName={setPageName} description={description} setDescription={setDescription} goal={goal} setGoal={setGoal} handleCreatePage={handleCreatePage} isCreating={isCreating} />
           </Tabs>
         </div>
       </div>

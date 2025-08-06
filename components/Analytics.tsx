@@ -26,121 +26,89 @@ interface ContractStats {
 
 const Analytics = ({tipPages, contractStats}: {tipPages: TipPage[], contractStats: ContractStats}) => {
     return (
-        <TabsContent value="analytics" className="space-y-6">
-        <div className="flex justify-between items-center">
-          <h2 className="text-2xl font-bold">Analytics Dashboard</h2>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm">
-              <Calendar className="h-4 w-4 mr-2" />
-              Last 30 Days
-            </Button>
-            <Button variant="outline" size="sm">
-              Export Data
-            </Button>
-          </div>
+      <TabsContent value="analytics" className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold">Analytics Dashboard</h2>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm">
+            <Calendar className="h-4 w-4 mr-2" />
+            Last 30 Days
+          </Button>
+          <Button variant="outline" size="sm">
+            Export Data
+          </Button>
         </div>
+      </div>
 
-        {/* Analytics Cards */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">This Month</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">+0.8 STRK</div>
-              <p className="text-xs text-muted-foreground">↗️ +23% from last month</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">New Supporters</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-600">12</div>
-              <p className="text-xs text-muted-foreground">↗️ +4 from last month</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Best Performing Page</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-sm font-bold">My Creative Journey</div>
-              <p className="text-xs text-muted-foreground">2.45 STRK total</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Peak Tip Day</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-sm font-bold">Yesterday</div>
-              <p className="text-xs text-muted-foreground">0.3 STRK in tips</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Detailed Analytics */}
-        <div className="grid lg:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Tips Over Time</CardTitle>
-              <CardDescription>Your tip earnings trend</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
-                <div className="text-center text-gray-500">
-                  <BarChart3 className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                  <p>Chart visualization would go here</p>
-                  <p className="text-sm">Showing earnings over the last 30 days</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Top Supporters</CardTitle>
-              <CardDescription>Your most generous supporters</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="font-medium">0x1234...5678</p>
-                    <p className="text-sm text-gray-500">3 tips</p>
-                  </div>
-                  <Badge variant="secondary">0.3 STRK</Badge>
-                </div>
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="font-medium">0x9876...4321</p>
-                    <p className="text-sm text-gray-500">2 tips</p>
-                  </div>
-                  <Badge variant="secondary">0.25 STRK</Badge>
-                </div>
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="font-medium">0x5555...7777</p>
-                    <p className="text-sm text-gray-500">1 tip</p>
-                  </div>
-                  <Badge variant="secondary">0.2 STRK</Badge>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Page Performance */}
+      {/* Analytics Cards with real data */}
+      <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card>
-          <CardHeader>
-            <CardTitle>Page Performance</CardTitle>
-            <CardDescription>How each of your tip pages is performing</CardDescription>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Total Pages</CardTitle>
           </CardHeader>
           <CardContent>
+            <div className="text-2xl font-bold text-green-600">{contractStats.totalPages?.toString() || "0"}</div>
+            <p className="text-xs text-muted-foreground">Pages created</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Total Tips Received</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">{contractStats.totalTips}</div>
+            <p className="text-xs text-muted-foreground">Across all pages</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Best Performing Page</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-sm font-bold">
+              {tipPages.length > 0 
+                ? tipPages.reduce((prev, current) => 
+                    (Number(prev.totalAmount) > Number(current.totalAmount)) ? prev : current
+                  ).name
+                : "No pages yet"
+              }
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {tipPages.length > 0 
+                ? `${tipPages.reduce((prev, current) => 
+                    (Number(prev.totalAmount) > Number(current.totalAmount)) ? prev : current
+                  ).totalAmount} ETH`
+                : "0 ETH"
+              }
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Average per Page</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-sm font-bold">
+              {tipPages.length > 0 ? (contractStats.totalAmount / tipPages.length).toFixed(6) : "0.000000"} ETH
+            </div>
+            <p className="text-xs text-muted-foreground">Per page average</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Page Performance with real data */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Page Performance</CardTitle>
+          <CardDescription>How each of your tip pages is performing</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {tipPages.length === 0 ? (
+            <p className="text-center text-gray-500 py-8">No pages to analyze yet</p>
+          ) : (
             <div className="space-y-4">
               {tipPages.map((page) => (
                 <div key={page.id} className="flex items-center justify-between p-4 border rounded-lg">
@@ -148,18 +116,18 @@ const Analytics = ({tipPages, contractStats}: {tipPages: TipPage[], contractStat
                     <h4 className="font-medium">{page.name}</h4>
                     <div className="flex items-center gap-4 text-sm text-gray-500 mt-1">
                       <span>{page.tipCount} tips</span>
-                      <span>{page.totalAmount} STRK</span>
+                      <span>{page.totalAmount} ETH</span>
                       <span>
                         Avg:{" "}
                         {page.tipCount > 0
-                          ? (Number.parseFloat(page.totalAmount) / page.tipCount).toFixed(3)
-                          : "0.000"}{" "}
-                        STRK
+                          ? (Number.parseFloat(page.totalAmount) / page.tipCount).toFixed(6)
+                          : "0.000000"}{" "}
+                        ETH
                       </span>
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-lg font-bold">{page.totalAmount} STRK</div>
+                    <div className="text-lg font-bold">{page.totalAmount} ETH</div>
                     <Badge variant={page.isActive ? "default" : "secondary"}>
                       {page.isActive ? "Active" : "Inactive"}
                     </Badge>
@@ -167,9 +135,10 @@ const Analytics = ({tipPages, contractStats}: {tipPages: TipPage[], contractStat
                 </div>
               ))}
             </div>
-          </CardContent>
-        </Card>
-      </TabsContent>
+          )}
+        </CardContent>
+      </Card>
+    </TabsContent>
     );
 };
 

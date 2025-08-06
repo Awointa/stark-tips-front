@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
+import { useAccount } from "@starknet-react/core"
 
 const CreateNewPage = ({pageName, setPageName, description, setDescription, goal, setGoal, handleCreatePage, isCreating}:{
     pageName: string,
@@ -14,8 +15,10 @@ const CreateNewPage = ({pageName, setPageName, description, setDescription, goal
     goal: string,
     setGoal: (goal: string) => void,
     handleCreatePage: () => void,
-    isCreating: boolean
+    isCreating: boolean,
 }) => {
+    const {account} = useAccount()
+
     return (
         <TabsContent value="create" className="space-y-6">
               <Card>
@@ -59,18 +62,24 @@ const CreateNewPage = ({pageName, setPageName, description, setDescription, goal
                       onChange={(e) => setGoal(e.target.value)}
                     />
                     <p className="text-sm text-gray-500">
-                      Set a fundraising goal in STRK to show progress to supporters
+                      Set a fundraising goal in ETH to show progress to supporters
                     </p>
                   </div>
 
                   <Button
                     onClick={handleCreatePage}
-                    disabled={isCreating}
+                    disabled={isCreating || !account}
                     className="w-full bg-purple-600 hover:bg-purple-700"
                     size="lg"
                   >
                     {isCreating ? "Creating Your Page..." : "Create Tip Page"}
                   </Button>
+
+                  {!account && (
+                    <p className="text-sm text-gray-500 text-center">
+                      Please connect your wallet to create a tip page
+                    </p>
+                  )}
                 </CardContent>
               </Card>
 
