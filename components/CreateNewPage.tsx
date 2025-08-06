@@ -5,19 +5,57 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
-import { useAccount } from "@starknet-react/core"
+import { useAccount, useContract, useSendTransaction} from "@starknet-react/core"
+import {  MY_CONTRACT_ABI } from "@/constants/abi/MyContract"
+import {CONTRACT_ADDRESS} from "@/constants/index"
 
-const CreateNewPage = ({pageName, setPageName, description, setDescription, goal, setGoal, handleCreatePage, isCreating}:{
+
+const CreateNewPage = ({pageName, setPageName, description, setDescription, goal, setGoal}:{
     pageName: string,
     setPageName: (name: string) => void,
     description: string,
     setDescription: (description: string) => void,
     goal: string,
     setGoal: (goal: string) => void,
-    handleCreatePage: () => void,
-    isCreating: boolean,
 }) => {
     const {account} = useAccount()
+    const {contract} = useContract({
+      abi:  MY_CONTRACT_ABI,
+      address: CONTRACT_ADDRESS,
+    });
+
+    // Setup the transaction hook - no calls defined initially
+    const { send, error, isPending, isSuccess, reset } = useSendTransaction({ 
+      calls: undefined, // We'll provide calls when we call send()
+    });
+
+    const handleCreatePage = () => {
+      if (!pageName.trim()) {
+        alert("Please enter a page name");
+        return;
+      }
+      
+      if (contract && account?.address && send) {
+        // Create calls with current form data
+        const calls = [contract.populate("create_tip_page", [
+          account.address, // creator_address
+          pageName, // page_name (current value)
+          description || "" // description (current value)
+        ])];
+        send(calls); // Send transaction with fresh data
+      }
+    };
+
+    // Reset error state when form values change
+    const handlePageNameChange = (name: string) => {
+      setPageName(name);
+      if (error) reset();
+    };
+
+    const handleDescriptionChange = (desc: string) => {
+      setDescription(desc);
+      if (error) reset();
+    };
 
     return (
         <TabsContent value="create" className="space-y-6">
@@ -36,7 +74,7 @@ const CreateNewPage = ({pageName, setPageName, description, setDescription, goal
                       id="pageName"
                       placeholder="e.g., Support My Art, Coffee Fund, Music Production"
                       value={pageName}
-                      onChange={(e) => setPageName(e.target.value)}
+                      onChange={(e) => handlePageNameChange(e.target.value)}
                     />
                   </div>
 
@@ -46,7 +84,7 @@ const CreateNewPage = ({pageName, setPageName, description, setDescription, goal
                       id="description"
                       placeholder="Tell your supporters what you're working on and how their tips will help..."
                       value={description}
-                      onChange={(e) => setDescription(e.target.value)}
+                      onChange={(e) => handleDescriptionChange(e.target.value)}
                       rows={4}
                     />
                   </div>
@@ -66,13 +104,31 @@ const CreateNewPage = ({pageName, setPageName, description, setDescription, goal
                     </p>
                   </div>
 
+                  {/* Show error message if transaction fails */}
+                  {error && (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-md">
+                      <p className="text-sm text-red-600">
+                        Error creating tip page: {error.message}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Show success message */}
+                  {isSuccess && (
+                    <div className="p-3 bg-green-50 border border-green-200 rounded-md">
+                      <p className="text-sm text-green-600">
+                        ✅ Tip page created successfully!
+                      </p>
+                    </div>
+                  )}
+
                   <Button
                     onClick={handleCreatePage}
-                    disabled={isCreating || !account}
+                    disabled={isPending || !account || !pageName.trim()}
                     className="w-full bg-purple-600 hover:bg-purple-700"
                     size="lg"
                   >
-                    {isCreating ? "Creating Your Page..." : "Create Tip Page"}
+                    {isPending ? "Creating Your Page..." : "Create Tip Page"}
                   </Button>
 
                   {!account && (
