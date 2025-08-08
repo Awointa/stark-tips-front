@@ -7,25 +7,22 @@ import { Badge } from "@/components/ui/badge"
 import { CheckCircle, ExternalLink, Share2, Heart, Copy } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
+import {useSearchParams} from "next/navigation"
 
 interface SuccessPageProps {
   params: {
     pageId: string
   }
-  searchParams: {
-    amount?: string
-    txHash?: string
-    message?: string
-  }
 }
 
-export default function TipSuccessPage({ params, searchParams }: SuccessPageProps) {
+export default function TipSuccessPage({ params }: SuccessPageProps) {
   const [confetti, setConfetti] = useState(true)
   const { toast } = useToast()
 
-  const amount = searchParams.amount || "0.1"
-  const txHash = searchParams.txHash || "0x1234567890abcdef..."
-  const message = searchParams.message || ""
+  const searchParams = useSearchParams()
+  const amount = searchParams.get("amount") || "0.1"
+  const txHash = searchParams.get("txHash") || "0x1234567890abcdef..."
+  const message = searchParams.get("message") || ""
 
   useEffect(() => {
     // Hide confetti after animation

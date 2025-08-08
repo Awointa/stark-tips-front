@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
 import {
   Heart,
   MessageCircle,
@@ -23,10 +22,11 @@ import {
 import { useToast } from "@/hooks/use-toast"
 import WalletConnect from "@/components/wallet-connect"
 import Link from "next/link"
-import { useAccount, useReadContract, useNetwork } from "@starknet-react/core";
+import { useAccount, useReadContract, useSendTransaction, useContract } from "@starknet-react/core";
 import { MY_CONTRACT_ABI } from "@/constants/abi/MyContract"
 import { CONTRACT_ADDRESS } from "@/constants"
 import { usePathname } from 'next/navigation';
+import { uint256 } from "starknet";
 
 interface TipPageProps {
   params: {
@@ -57,7 +57,6 @@ interface PageData {
 export default function TipPage({ params }: TipPageProps) {
   const pathname = usePathname();
   const id = pathname.split('/').pop();
-  const {chain} = useNetwork();
   const { address, status } = useAccount(); 
   const [customAmount, setCustomAmount] = useState("")
   const [message, setMessage] = useState("")
@@ -68,6 +67,11 @@ export default function TipPage({ params }: TipPageProps) {
   const [txHash, setTxHash] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  const { contract } = useContract({ 
+    abi: MY_CONTRACT_ABI, 
+    address: CONTRACT_ADDRESS
+  })
 
   console.log('ID:', id)
 
@@ -81,6 +85,11 @@ export default function TipPage({ params }: TipPageProps) {
   console.log('Contract data:', data)
   console.log('Contract loading:', contractLoading)
   console.log('Contract error:', contractError)
+
+  // Fixed useSendTransaction implementation
+  const { send, sendAsync, data: txData, error: sendError, status: txStatus, isPending, isSuccess, isError } = useSendTransaction({
+    calls: undefined, // Don't pre-populate calls - we'll pass them to send()
+  });
 
   useEffect(() => {
     if (status === "disconnected") {
@@ -160,6 +169,17 @@ export default function TipPage({ params }: TipPageProps) {
     }
   }, [data, contractLoading, contractError, id]);
 
+  // Monitor transaction status from the hook
+  useEffect(() => {
+    if (txStatus === 'success' && !isSending) {
+      // Transaction confirmed on network
+      console.log('Transaction confirmed:', txData)
+    }
+    if (txStatus === 'error' && sendError) {
+      console.error('Transaction error:', sendError)
+    }
+  }, [txStatus, txData, sendError, isSending])
+
   const [recentTips, setRecentTips] = useState<Tip[]>([
     {
       id: "1",
@@ -197,6 +217,7 @@ export default function TipPage({ params }: TipPageProps) {
     { strk: "1.0", label: "Incredible", emoji: "🚀" },
   ]
 
+  // Fixed handleSendTip function
   const handleSendTip = async () => {
     const amount = selectedAmount || customAmount
     if (!amount || Number.parseFloat(amount) <= 0) {
@@ -208,7 +229,7 @@ export default function TipPage({ params }: TipPageProps) {
       return
     }
 
-    if (!isConnected) {
+    if (!isConnected || !address) {
       toast({
         title: "Wallet Required",
         description: "Please connect your wallet to send a tip",
@@ -217,52 +238,111 @@ export default function TipPage({ params }: TipPageProps) {
       return
     }
 
-    setIsSending(true)
-    setTransactionStatus("pending")
+    if (!contract) {
+      toast({
+        title: "Contract Error",
+        description: "Contract not initialized",
+        variant: "destructive",
+      })
+      return
+    }
 
     try {
-      // Simulate contract interaction with realistic delays
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      setIsSending(true)
+      setTransactionStatus("pending")
 
-      // Simulate transaction hash generation
-      const mockTxHash = `0x${Math.random().toString(16).substring(2, 18)}...`
-      setTxHash(mockTxHash)
+      // Convert amount to wei (assuming 18 decimals for STRK)
+      // If your token has different decimals, adjust accordingly
+      const amountInWei = BigInt(Math.floor(parseFloat(amount) * Math.pow(10, 18)))
+      
+      // Convert to uint256 format expected by Starknet
+      const amountAsUint256 = uint256.bnToUint256(amountInWei)
+      
+      console.log('Sending tip with params:', {
+        pageId: Number(id),
+        amount: amountAsUint256,
+        message: message
+      })
 
-      // Simulate network confirmation delay
-      await new Promise((resolve) => setTimeout(resolve, 2000))
+      // Call the contract function
+      const calls = [
+        contract.populate("send_tip", [
+          Number(id), // page_id
+          amountAsUint256, // amount in uint256 format
+          message // message
+        ])
+      ]
 
-      const newTip: Tip = {
-        id: Date.now().toString(),
-        sender: "0xYour...Wallet",
-        amount,
-        message,
-        timestamp: Date.now(),
-        txHash: mockTxHash,
+      // Send the transaction
+      const result = await sendAsync(calls)
+      
+      console.log('Transaction result:', result)
+      
+      if (result) {
+        const txHashResult = result.transaction_hash
+        setTxHash(txHashResult)
+        setTransactionStatus("success")
+
+        // Create a new tip object for the UI
+        const newTip: Tip = {
+          id: Date.now().toString(),
+          sender: `${address.slice(0, 6)}...${address.slice(-4)}`,
+          amount,
+          message,
+          timestamp: Date.now(),
+          txHash: txHashResult,
+        }
+
+        // Update the UI with the new tip
+        setRecentTips((prev) => [newTip, ...prev])
+        setPageData((prev) => ({
+          ...prev,
+          total_amount_recieved: Number.parseFloat((Number.parseFloat(String(prev.total_amount_recieved)) + Number.parseFloat(String(amount))).toFixed(3)),
+          total_tips_recieved: prev.total_tips_recieved + 1,
+        }))
+
+        // Clear the form
+        setSelectedAmount(null)
+        setCustomAmount("")
+        setMessage("")
+
+        toast({
+          title: "Tip Sent Successfully! 🎉",
+          description: `Your tip of ${amount} STRK has been sent!`,
+        })
+
+        // Optional: Redirect to success page
+        // window.location.href = `/tip/${id}/success?amount=${amount}&txHash=${txHashResult}&message=${encodeURIComponent(message)}`
+        
+      } else {
+        throw new Error('Transaction failed - no result returned')
       }
 
-      setRecentTips((prev) => [newTip, ...prev])
-      setPageData((prev) => ({
-        ...prev,
-        total_amount_recieved: Number.parseFloat((Number.parseFloat(String(prev.total_amount_recieved)) + Number.parseFloat(String(amount))).toFixed(3)),
-        total_tips_recieved: prev.total_tips_recieved + 1,
-      }))
-
-      setTransactionStatus("success")
-      setSelectedAmount(null)
-      setCustomAmount("")
-      setMessage("")
-
-      // Redirect to success page
-      window.location.href = `/tip/${params.id}/success?amount=${amount}&txHash=${mockTxHash}&message=${encodeURIComponent(message)}`
     } catch (error) {
+      console.error('Error sending tip:', error)
       setTransactionStatus("error")
+      
+      let errorMessage = "There was an error sending your tip. Please try again."
+      
+      // Handle specific error types
+      if (error instanceof Error) {
+        if (error.message.includes('User abort')) {
+          errorMessage = "Transaction was cancelled by user"
+        } else if (error.message.includes('insufficient')) {
+          errorMessage = "Insufficient balance to complete transaction"
+        } else if (error.message.includes('rejected')) {
+          errorMessage = "Transaction was rejected"
+        }
+      }
+
       toast({
         title: "Transaction Failed",
-        description: "There was an error sending your tip. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       })
     } finally {
       setIsSending(false)
+      // Reset transaction status after 3 seconds
       setTimeout(() => {
         setTransactionStatus("idle")
         setTxHash(null)
@@ -315,6 +395,9 @@ export default function TipPage({ params }: TipPageProps) {
     const ethToUsd = 2000
     return (Number.parseFloat(ethAmount) * ethToUsd).toFixed(2)
   }
+
+  // Button disabled state using hook's status
+  const isButtonDisabled = isSending || !isConnected || !contract || isPending || txStatus === 'pending'
 
   // Show loading state
   if (isLoading) {
@@ -526,11 +609,11 @@ export default function TipPage({ params }: TipPageProps) {
 
                   <Button
                     onClick={handleSendTip}
-                    disabled={isSending || !isConnected || transactionStatus === "pending"}
+                    disabled={isButtonDisabled}
                     className="w-full bg-purple-600 hover:bg-purple-700"
                     size="lg"
                   >
-                    {isSending ? (
+                    {(isSending || isPending) ? (
                       <>
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                         Sending Tip...
@@ -544,6 +627,7 @@ export default function TipPage({ params }: TipPageProps) {
                     <p className="text-sm text-gray-500 text-center">Connect your Starknet wallet to send a tip</p>
                   )}
                 </CardContent>
+                
               </Card>
             </div>
 
@@ -570,7 +654,7 @@ export default function TipPage({ params }: TipPageProps) {
                         </div>
                       </div>
                       {tip.message && (
-                        <p className="text-sm text-gray-700 mb-2 bg-gray-50 p-2 rounded">"{tip.message}"</p>
+                        <p className="text-sm text-gray-700 mb-2 bg-gray-50 p-2 rounded">&quot{tip.message}&quot</p>
                       )}
                       <div className="flex justify-between items-center">
                         <span className="text-xs text-gray-400">{formatTimeAgo(tip.timestamp)}</span>

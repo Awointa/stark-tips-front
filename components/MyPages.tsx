@@ -5,9 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Copy, Eye, Share2 } from "lucide-react"
 import Link from "next/link"
-import {MY_CONTRACT_ABI} from "@/constants/abi/MyContract"
-import {CONTRACT_ADDRESS} from "@/constants"
-import {useSendTransaction} from "@starknet-react/core"
+
 
 interface TipPage {
     id: string
