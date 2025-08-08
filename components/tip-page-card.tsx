@@ -69,7 +69,7 @@ export default function TipPageCard({ page, onToggleStatus, onViewAnalytics }: T
             </div>
             <CardDescription className="mb-3">{page.description}</CardDescription>
             <div className="flex items-center gap-4 text-sm text-gray-600">
-              <span className="font-medium">{page.totalAmount} ETH raised</span>
+              <span className="font-medium">{page.totalAmount} STRK raised</span>
               <span>{page.tipCount} tips</span>
               <span>Created {new Date(page.createdAt).toLocaleDateString()}</span>
             </div>

@@ -5,6 +5,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Copy, Eye, Share2 } from "lucide-react"
 import Link from "next/link"
+import {MY_CONTRACT_ABI} from "@/constants/abi/MyContract"
+import {CONTRACT_ADDRESS} from "@/constants"
+import {useSendTransaction} from "@starknet-react/core"
 
 interface TipPage {
     id: string
@@ -18,6 +21,7 @@ interface TipPage {
 }
 
 const MyPages = ({tipPages, setActiveTab, copyLink, shareLink, togglePageStatus}: {tipPages: TipPage[], setActiveTab: (tab: string) => void, copyLink: (pageId: string) => void, shareLink: (pageId: string, pageName: string) => void, togglePageStatus: (pageId: string) => void}) => {
+    
     return  (
                 <TabsContent value="pages" className="space-y-6">
                   <div className="flex justify-between items-center">
@@ -57,7 +61,7 @@ const MyPages = ({tipPages, setActiveTab, copyLink, shareLink, togglePageStatus}
                             </div>
                             <CardDescription className="mb-3">{page.description}</CardDescription>
                             <div className="flex items-center gap-4 text-sm text-gray-600">
-                              <span>{page.totalAmount} ETH raised</span>
+                              <span>{page.totalAmount} STRK raised</span>
                               <span>{page.tipCount} tips</span>
                               <span>Created {new Date(page.createdAt).toLocaleDateString()}</span>
                             </div>

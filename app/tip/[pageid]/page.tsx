@@ -23,11 +23,14 @@ import {
 import { useToast } from "@/hooks/use-toast"
 import WalletConnect from "@/components/wallet-connect"
 import Link from "next/link"
-import { useAccount } from "@starknet-react/core";
+import { useAccount, useReadContract, useNetwork } from "@starknet-react/core";
+import { MY_CONTRACT_ABI } from "@/constants/abi/MyContract"
+import { CONTRACT_ADDRESS } from "@/constants"
+import { usePathname } from 'next/navigation';
 
 interface TipPageProps {
   params: {
-    pageId: string
+    id: string      
   }
 }
 
@@ -41,16 +44,20 @@ interface Tip {
 }
 
 interface PageData {
-  creatorName: string
-  creatorAddress: string
-  description: string
-  totalAmount: string
-  tipCount: number
-  goal?: string
-  avatar?: string
+  created_at: number
+  creator: number
+  description: string 
+  id: number
+  is_active: boolean
+  name: string
+  total_amount_recieved: number
+  total_tips_recieved: number
 }
 
 export default function TipPage({ params }: TipPageProps) {
+  const pathname = usePathname();
+  const id = pathname.split('/').pop();
+  const {chain} = useNetwork();
   const { address, status } = useAccount(); 
   const [customAmount, setCustomAmount] = useState("")
   const [message, setMessage] = useState("")
@@ -59,6 +66,21 @@ export default function TipPage({ params }: TipPageProps) {
   const [isConnected, setIsConnected] = useState(false)
   const [transactionStatus, setTransactionStatus] = useState<"idle" | "pending" | "success" | "error">("idle")
   const [txHash, setTxHash] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  console.log('ID:', id)
+
+  const {data, isLoading: contractLoading, error: contractError} = useReadContract({
+    abi: MY_CONTRACT_ABI,
+    functionName: "get_page_info",
+    address: CONTRACT_ADDRESS,
+    args: [Number(id)]
+  })
+
+  console.log('Contract data:', data)
+  console.log('Contract loading:', contractLoading)
+  console.log('Contract error:', contractError)
 
   useEffect(() => {
     if (status === "disconnected") {
@@ -69,14 +91,74 @@ export default function TipPage({ params }: TipPageProps) {
   }, [address, status])
 
   const [pageData, setPageData] = useState<PageData>({
-    creatorName: "Creative Artist",
-    creatorAddress: "0x1234567890abcdef1234567890abcdef12345678",
-    description:
-      "Supporting my journey in digital art and creativity. Every tip helps me continue creating amazing content for the community! 🎨✨ Your support means everything to me and helps me dedicate more time to creating beautiful art.",
-    totalAmount: "2.45",
-    tipCount: 23,
-    goal: "5.0",
+    created_at: 0,
+    creator: 0,
+    description: "Loading...",
+    id: 0,
+    is_active: false,
+    name: "Loading...",
+    total_amount_recieved: 0,
+    total_tips_recieved: 0,
   })
+
+  // Update pageData when contract data is available
+  useEffect(() => {
+    console.log('Effect triggered - data:', data, 'contractLoading:', contractLoading, 'contractError:', contractError)
+    
+    // If still loading, keep loading state
+    if (contractLoading) {
+      setIsLoading(true)
+      setError(null)
+      return
+    }
+
+    // If there's an error, set error state
+    if (contractError) {
+      console.error('Contract error:', contractError)
+      setError("Failed to load page data")
+      setIsLoading(false)
+      return
+    }
+
+    // If we have data, process it
+    if (data) {
+      try {
+        console.log('Processing data:', data)
+        
+        // Handle different possible data structures
+        let contractData;
+        if (Array.isArray(data) && data.length > 0) {
+          contractData = data[0];
+        } else if (typeof data === 'object' && data !== null) {
+          contractData = data;
+        } else {
+          throw new Error('Invalid data structure')
+        }
+        
+        setPageData({
+          created_at: contractData.created_at || 0,
+          creator: contractData.creator || 0,
+          description: contractData.description || "No description available",
+          id: Number(id) || 0,
+          is_active: contractData.is_active || false,
+          name: contractData.name || "Unknown Creator",
+          total_amount_recieved: contractData.total_amount_recieved || 0,
+          total_tips_recieved: contractData.total_tips_recieved || 0,
+        });
+        
+        setIsLoading(false);
+        setError(null);
+      } catch (err) {
+        console.error('Error processing data:', err)
+        setError("Failed to process page data");
+        setIsLoading(false);
+      }
+    } else if (data === undefined && !contractLoading) {
+      // Data is undefined and not loading - this might mean the page doesn't exist
+      setError("Page not found");
+      setIsLoading(false);
+    }
+  }, [data, contractLoading, contractError, id]);
 
   const [recentTips, setRecentTips] = useState<Tip[]>([
     {
@@ -107,18 +189,13 @@ export default function TipPage({ params }: TipPageProps) {
 
   const { toast } = useToast()
   const quickAmounts = [
-    { eth: "0.01", label: "Coffee", emoji: "☕" },
-    { eth: "0.05", label: "Snack", emoji: "🍕" },
-    { eth: "0.1", label: "Lunch", emoji: "🍔" },
-    { eth: "0.25", label: "Generous", emoji: "💝" },
-    { eth: "0.5", label: "Amazing", emoji: "🌟" },
-    { eth: "1.0", label: "Incredible", emoji: "🚀" },
+    { strk: "0.01", label: "Coffee", emoji: "☕" },
+    { strk: "0.05", label: "Snack", emoji: "🍕" },
+    { strk: "0.1", label: "Lunch", emoji: "🍔" },
+    { strk: "0.25", label: "Generous", emoji: "💝" },
+    { strk: "0.5", label: "Amazing", emoji: "🌟" },
+    { strk: "1.0", label: "Incredible", emoji: "🚀" },
   ]
-
-  // Calculate progress towards goal
-  const progressPercentage = pageData.goal
-    ? Math.min((Number.parseFloat(pageData.totalAmount) / Number.parseFloat(pageData.goal)) * 100, 100)
-    : 0
 
   const handleSendTip = async () => {
     const amount = selectedAmount || customAmount
@@ -166,8 +243,8 @@ export default function TipPage({ params }: TipPageProps) {
       setRecentTips((prev) => [newTip, ...prev])
       setPageData((prev) => ({
         ...prev,
-        totalAmount: (Number.parseFloat(prev.totalAmount) + Number.parseFloat(amount)).toFixed(3),
-        tipCount: prev.tipCount + 1,
+        total_amount_recieved: Number.parseFloat((Number.parseFloat(String(prev.total_amount_recieved)) + Number.parseFloat(String(amount))).toFixed(3)),
+        total_tips_recieved: prev.total_tips_recieved + 1,
       }))
 
       setTransactionStatus("success")
@@ -176,7 +253,7 @@ export default function TipPage({ params }: TipPageProps) {
       setMessage("")
 
       // Redirect to success page
-      window.location.href = `/tip/${params.pageId}/success?amount=${amount}&txHash=${mockTxHash}&message=${encodeURIComponent(message)}`
+      window.location.href = `/tip/${params.id}/success?amount=${amount}&txHash=${mockTxHash}&message=${encodeURIComponent(message)}`
     } catch (error) {
       setTransactionStatus("error")
       toast({
@@ -194,12 +271,12 @@ export default function TipPage({ params }: TipPageProps) {
   }
 
   const shareLink = () => {
-    const url = `${window.location.origin}/tip/${params.pageId}`
-    const text = `Support ${pageData.creatorName} on StarkTips! 💜`
+    const url = `${window.location.origin}/tip/${params.id}`
+    const text = `Support ${pageData.name} on StarkTips! 💜`
 
     if (navigator.share) {
       navigator.share({
-        title: `Support ${pageData.creatorName}`,
+        title: `Support ${pageData.name}`,
         text: text,
         url: url,
       })
@@ -213,7 +290,7 @@ export default function TipPage({ params }: TipPageProps) {
   }
 
   const copyLink = () => {
-    const url = `${window.location.origin}/tip/${params.pageId}`
+    const url = `${window.location.origin}/tip/${params.id}`
     navigator.clipboard.writeText(url)
     toast({
       title: "Link Copied! 📋",
@@ -239,6 +316,37 @@ export default function TipPage({ params }: TipPageProps) {
     return (Number.parseFloat(ethAmount) * ethToUsd).toFixed(2)
   }
 
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-purple-600" />
+          <p className="text-gray-600">Loading page data...</p>
+          <p className="text-xs text-gray-400 mt-2">Contract loading: {contractLoading.toString()}</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 flex items-center justify-center">
+        <div className="text-center">
+          <AlertCircle className="h-8 w-8 text-red-500 mx-auto mb-4" />
+          <p className="text-red-600 mb-4">{error}</p>
+          <Button 
+            onClick={() => window.location.reload()} 
+            variant="outline"
+          >
+            Try Again
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50">
       {/* Header */}
@@ -253,7 +361,7 @@ export default function TipPage({ params }: TipPageProps) {
                 </Button>
               </Link>
               <div className="h-6 w-px bg-gray-300" />
-              <h1 className="text-lg font-semibold">Support {pageData.creatorName}</h1>
+              <h1 className="text-lg font-semibold">Support {pageData.name}</h1>
             </div>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={copyLink}>
@@ -279,32 +387,20 @@ export default function TipPage({ params }: TipPageProps) {
                 <CardHeader>
                   <div className="flex items-center gap-4">
                     <div className="w-20 h-20 bg-gradient-to-br from-purple-400 to-blue-400 rounded-full flex items-center justify-center text-white text-3xl font-bold">
-                      {pageData.creatorName.charAt(0)}
+                      {pageData.name.charAt(0)}
                     </div>
                     <div className="flex-1">
-                      <CardTitle className="text-2xl mb-2">{pageData.creatorName}</CardTitle>
+                      <CardTitle className="text-2xl mb-2">{pageData.name}</CardTitle>
                       <div className="flex items-center gap-4 text-sm text-gray-600 mb-3">
                         <span className="flex items-center gap-1">
                           <Heart className="h-4 w-4 text-red-500" />
-                          {pageData.totalAmount} STRK raised
+                          {pageData.total_amount_recieved} STRK raised
                         </span>
                         <span className="flex items-center gap-1">
                           <Users className="h-4 w-4 text-blue-500" />
-                          {pageData.tipCount} supporters
+                          {pageData.total_tips_recieved} supporters
                         </span>
                       </div>
-                      {pageData.goal && (
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-sm">
-                            <span>Progress to goal</span>
-                            <span>{progressPercentage.toFixed(1)}%</span>
-                          </div>
-                          <Progress value={progressPercentage} className="h-2" />
-                          <p className="text-xs text-gray-500">
-                            {pageData.totalAmount} STRK of {pageData.goal} STRK goal
-                          </p>
-                        </div>
-                      )}
                     </div>
                   </div>
                 </CardHeader>
@@ -318,7 +414,7 @@ export default function TipPage({ params }: TipPageProps) {
                 <CardHeader>
                   <CardTitle>Send a Tip 💜</CardTitle>
                   <CardDescription>
-                    Your tip goes directly to {pageData.creatorName}'s wallet on Starknet. Show your support!
+                    Your tip goes directly to {pageData.name}'s wallet on Starknet. Show your support!
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -370,18 +466,18 @@ export default function TipPage({ params }: TipPageProps) {
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                       {quickAmounts.map((amount) => (
                         <Button
-                          key={amount.eth}
-                          variant={selectedAmount === amount.eth ? "default" : "outline"}
+                          key={amount.strk}
+                          variant={selectedAmount === amount.strk ? "default" : "outline"}
                           onClick={() => {
-                            setSelectedAmount(amount.eth)
+                            setSelectedAmount(amount.strk)
                             setCustomAmount("")
                           }}
                           className="h-auto py-4 flex flex-col gap-1"
                           disabled={isSending}
                         >
                           <div className="text-lg">{amount.emoji}</div>
-                          <div className="font-semibold">{amount.eth} STRK</div>
-                          <div className="text-xs opacity-70">${getAmountInUSD(amount.eth)}</div>
+                          <div className="font-semibold">{amount.strk} STRK</div>
+                          <div className="text-xs opacity-70">${getAmountInUSD(amount.strk)}</div>
                           <div className="text-xs opacity-60">{amount.label}</div>
                         </Button>
                       ))}
@@ -440,7 +536,7 @@ export default function TipPage({ params }: TipPageProps) {
                         Sending Tip...
                       </>
                     ) : (
-                      `Send Tip ${selectedAmount || customAmount ? `(${selectedAmount || customAmount} ETH)` : ""}`
+                      `Send Tip ${selectedAmount || customAmount ? `(${selectedAmount || customAmount} STRK)` : ""}`
                     )}
                   </Button>
 
@@ -468,7 +564,7 @@ export default function TipPage({ params }: TipPageProps) {
                         <span className="text-sm font-mono text-gray-500">{tip.sender}</span>
                         <div className="text-right">
                           <Badge variant="secondary" className="mb-1">
-                            {tip.amount} ETH
+                            {tip.amount} STRK
                           </Badge>
                           <p className="text-xs text-gray-400">${getAmountInUSD(tip.amount)}</p>
                         </div>
@@ -499,40 +595,38 @@ export default function TipPage({ params }: TipPageProps) {
                   <div className="flex justify-between">
                     <span className="text-gray-600">Total Raised</span>
                     <div className="text-right">
-                      <span className="font-semibold">{pageData.totalAmount} ETH</span>
-                      <p className="text-xs text-gray-500">${getAmountInUSD(pageData.totalAmount)}</p>
+                      <span className="font-semibold">{pageData.total_amount_recieved} STRK</span>
+                      <p className="text-xs text-gray-500">${getAmountInUSD(String(pageData.total_amount_recieved))}</p>
                     </div>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Total Tips</span>
-                    <span className="font-semibold">{pageData.tipCount}</span>
+                    <span className="font-semibold">{pageData.total_tips_recieved}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Average Tip</span>
                     <div className="text-right">
                       <span className="font-semibold">
-                        {(Number.parseFloat(pageData.totalAmount) / pageData.tipCount).toFixed(3)} ETH
+                        {pageData.total_tips_recieved > 0 
+                          ? (Number.parseFloat(String(pageData.total_amount_recieved)) / Number.parseFloat(String(pageData.total_tips_recieved))).toFixed(3)
+                          : "0"} STRK
                       </span>
                       <p className="text-xs text-gray-500">
-                        ${((Number.parseFloat(pageData.totalAmount) / pageData.tipCount) * 2000).toFixed(2)}
+                        ${pageData.total_tips_recieved > 0
+                          ? ((Number.parseFloat(String(pageData.total_amount_recieved)) / Number.parseFloat(String(pageData.total_tips_recieved))) * 2000).toFixed(2)
+                          : "0.00"}
                       </p>
                     </div>
                   </div>
-                  {pageData.goal && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Goal Progress</span>
-                      <span className="font-semibold">{progressPercentage.toFixed(1)}%</span>
-                    </div>
-                  )}
                 </CardContent>
               </Card>
 
-              {/* Powered by Thanksonchain */}
+              {/* Powered by StarkTips */}
               <Card className="bg-purple-50 border-purple-200">
                 <CardContent className="p-4 text-center">
                   <p className="text-sm text-purple-700 mb-2">Powered by</p>
                   <Link href="/" className="font-bold text-purple-900 text-lg">
-                    Thanksonchain
+                    StarkTips
                   </Link>
                   <p className="text-xs text-purple-600 mt-1">Starknet Creator Tipping Platform</p>
                 </CardContent>

@@ -77,7 +77,7 @@ export default function Dashboard() {
       args: account?.address ? [account.address] : undefined,
       enabled: !!account?.address,
     })
-    console.log(creatorPagesData)
+  
 
   // Fetch page details for each user page
   const fetchPageDetails = useCallback(async (pageIds: bigint[]) => {
@@ -202,35 +202,35 @@ export default function Dashboard() {
 
 
   const [tipPages, setTipPages] = useState<TipPage[]>([
-    {
-      id: "creative-journey",
-      name: "My Creative Journey",
-      description: "Supporting my digital art and creative projects. Every tip helps me continue creating!",
-      totalAmount: "2.45",
-      tipCount: 23,
-      createdAt: "2024-01-15",
-      isActive: true,
-      goal: "5.0",
-    },
-    {
-      id: "music-production",
-      name: "Music Production Fund",
-      description: "Help me produce my next album and share it with the world!",
-      totalAmount: "1.2",
-      tipCount: 8,
-      createdAt: "2024-01-10",
-      isActive: true,
-      goal: "10.0",
-    },
-    {
-      id: "coding-tutorials",
-      name: "Coding Tutorials",
-      description: "Creating free coding tutorials for the community.",
-      totalAmount: "0.8",
-      tipCount: 12,
-      createdAt: "2024-01-05",
-      isActive: false,
-    },
+    // {
+    //   id: "creative-journey",
+    //   name: "My Creative Journey",
+    //   description: "Supporting my digital art and creative projects. Every tip helps me continue creating!",
+    //   totalAmount: "2.45",
+    //   tipCount: 23,
+    //   createdAt: "2024-01-15",
+    //   isActive: true,
+    //   goal: "5.0",
+    // },
+    // {
+    //   id: "music-production",
+    //   name: "Music Production Fund",
+    //   description: "Help me produce my next album and share it with the world!",
+    //   totalAmount: "1.2",
+    //   tipCount: 8,
+    //   createdAt: "2024-01-10",
+    //   isActive: true,
+    //   goal: "10.0",
+    // },
+    // {
+    //   id: "coding-tutorials",
+    //   name: "Coding Tutorials",
+    //   description: "Creating free coding tutorials for the community.",
+    //   totalAmount: "0.8",
+    //   tipCount: 12,
+    //   createdAt: "2024-01-05",
+    //   isActive: false,
+    // },
   ])
 
   const handleCreatePage = async () => {
