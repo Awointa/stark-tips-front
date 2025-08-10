@@ -14,6 +14,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import {ready, braavos, useInjectedConnectors, useAccount, useConnect, useDisconnect} from "@starknet-react/core"
+import { Connector } from "@starknet-react/core"
 
 interface WalletConnectProps {
   onConnectionChange?: (connected: boolean) => void
@@ -46,7 +47,7 @@ export default function WalletConnect({ onConnectionChange }: WalletConnectProps
     }
   }, [error])
 
-  const connectWallet = async (connector: any) => {
+  const connectWallet = async (connector: Connector) => {
     setConnectionError(null)
     setIsModalOpen(false) // Close modal once a wallet is selected
 
@@ -55,6 +56,7 @@ export default function WalletConnect({ onConnectionChange }: WalletConnectProps
       connect({ connector });
     } catch (error) {
       setConnectionError(`Failed to connect to ${connector.name}. Please ensure it's installed and unlocked.`)
+      console.error(error)
     } 
   }
 
@@ -156,13 +158,15 @@ export default function WalletConnect({ onConnectionChange }: WalletConnectProps
               >
                 <div className="flex items-center gap-3">
                   {connector.icon && (
-                    <img 
+                    <Image 
                       src={typeof connector.icon === "string" ? connector.icon : connector.icon.light} 
                       alt={connector.name}
                       className="h-6 w-6"
                       onError={(e) => {
                         e.currentTarget.style.display = 'none'
                       }}
+                      width={200}
+                      height={200}
                     />
                   )}
                   {connector.name}

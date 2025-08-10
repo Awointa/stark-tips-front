@@ -54,7 +54,7 @@ export default function DemoPage() {
                       <CardDescription className="flex items-center gap-4 mt-2">
                         <span className="flex items-center gap-1">
                           <Heart className="h-4 w-4" />
-                          3.2 ETH raised
+                          3.2 STRK raised
                         </span>
                         <span className="flex items-center gap-1">
                           <Users className="h-4 w-4" />
@@ -66,7 +66,7 @@ export default function DemoPage() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-gray-600">
-                    I'm a digital artist creating amazing NFT collections and teaching others about blockchain art. Your
+                    I&apos;m a digital artist creating amazing NFT collections and teaching others about blockchain art. Your
                     support helps me continue creating and sharing knowledge with the community! 🎨✨
                   </p>
                 </CardContent>
@@ -84,16 +84,16 @@ export default function DemoPage() {
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-4 gap-2">
                     <Button variant="outline" disabled>
-                      0.01 ETH
+                      0.01  STRK
                     </Button>
                     <Button variant="outline" disabled>
-                      0.05 ETH
+                      0.05 STRK
                     </Button>
                     <Button variant="default" disabled>
-                      0.1 ETH
+                      0.1 STRK
                     </Button>
                     <Button variant="outline" disabled>
-                      0.25 ETH
+                      0.25 STRK
                     </Button>
                   </div>
 
@@ -125,7 +125,7 @@ export default function DemoPage() {
                     <div key={index} className="border-b border-gray-100 pb-4 last:border-b-0">
                       <div className="flex justify-between items-start mb-2">
                         <span className="text-sm font-mono text-gray-500">{tip.sender}</span>
-                        <Badge variant="secondary">{tip.amount} ETH</Badge>
+                        <Badge variant="secondary">{tip.amount} STRK</Badge>
                       </div>
                       <p className="text-sm text-gray-700 mb-2">{tip.message}</p>
                       <span className="text-xs text-gray-400">{tip.timestamp}</span>
@@ -142,7 +142,7 @@ export default function DemoPage() {
                 <CardContent className="space-y-4">
                   <div className="flex justify-between">
                     <span className="text-gray-600">Total Raised</span>
-                    <span className="font-semibold">3.2 ETH</span>
+                    <span className="font-semibold">3.2 STRK</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Total Tips</span>
@@ -150,7 +150,7 @@ export default function DemoPage() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Average Tip</span>
-                    <span className="font-semibold">0.068 ETH</span>
+                    <span className="font-semibold">0.068 STRK</span>
                   </div>
                 </CardContent>
               </Card>

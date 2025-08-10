@@ -40,8 +40,10 @@ export default function Dashboard() {
   const [pageName, setPageName] = useState("")
   const [description, setDescription] = useState("")
   const [goal, setGoal] = useState("")
+  const [tipPages, setTipPages] = useState<TipPage[]>([])
   const [isCreating, setIsCreating] = useState(false)
   const [activeTab, setActiveTab] = useState("overview")
+  
   const [userPages, setUserPages] = useState<bigint[]>([])
   const [contractStats, setContractStats] = useState<ContractStats>({
     totalPages: undefined,
@@ -201,37 +203,6 @@ export default function Dashboard() {
   }, [userPages, account, fetchPageDetails, totalPagesData]);
 
 
-  const [tipPages, setTipPages] = useState<TipPage[]>([
-    // {
-    //   id: "creative-journey",
-    //   name: "My Creative Journey",
-    //   description: "Supporting my digital art and creative projects. Every tip helps me continue creating!",
-    //   totalAmount: "2.45",
-    //   tipCount: 23,
-    //   createdAt: "2024-01-15",
-    //   isActive: true,
-    //   goal: "5.0",
-    // },
-    // {
-    //   id: "music-production",
-    //   name: "Music Production Fund",
-    //   description: "Help me produce my next album and share it with the world!",
-    //   totalAmount: "1.2",
-    //   tipCount: 8,
-    //   createdAt: "2024-01-10",
-    //   isActive: true,
-    //   goal: "10.0",
-    // },
-    // {
-    //   id: "coding-tutorials",
-    //   name: "Coding Tutorials",
-    //   description: "Creating free coding tutorials for the community.",
-    //   totalAmount: "0.8",
-    //   tipCount: 12,
-    //   createdAt: "2024-01-05",
-    //   isActive: false,
-    // },
-  ])
 
   const handleCreatePage = async () => {
     if (!pageName.trim()) {
@@ -252,7 +223,7 @@ export default function Dashboard() {
       return
     }
 
-    setIsCreating(true)
+    // setIsCreating(true)
       try {
         // Call the contract to create a tip page
         const result = await contract.create_tip_page(
@@ -360,7 +331,7 @@ export default function Dashboard() {
   const totalEarnings = contractStats.totalAmount;
   const totalTips = contractStats.totalTips;
   const activePagesCount = contractStats.activePagesCount;
-  const averageTip = contractStats.averageTip;
+  // const averageTip = contractStats.averageTip;
 
 
   return (
@@ -460,7 +431,7 @@ export default function Dashboard() {
                 <Card>
                   <CardContent className="pt-6">
                     <div className="text-center text-gray-500">
-                      <p>You haven't created any tip pages yet.</p>
+                      <p>You haven&apos;t created any tip pages yet.</p>
                       <Button 
                         onClick={() => setActiveTab("create")} 
                         className="mt-4 bg-purple-600 hover:bg-purple-700"
@@ -484,7 +455,7 @@ export default function Dashboard() {
                       <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                       <div className="flex-1">
                         <p className="text-sm font-medium">New tip received</p>
-                        <p className="text-xs text-gray-500">0.1 STRK on "My Creative Journey" • 2 hours ago</p>
+                        <p className="text-xs text-gray-500">0.1 STRK on My Creative Journey • 2 hours ago</p>
                       </div>
                       <Badge variant="secondary">+0.1 STRK</Badge>
                     </div>
@@ -494,7 +465,7 @@ export default function Dashboard() {
                       <div className="flex-1">
                         <p className="text-sm font-medium">Page shared</p>
                         <p className="text-xs text-gray-500">
-                          "Music Production Fund" shared on social media • 5 hours ago
+                          Music Production Fund shared on social media • 5 hours ago
                         </p>
                       </div>
                     </div>
@@ -503,7 +474,7 @@ export default function Dashboard() {
                       <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
                       <div className="flex-1">
                         <p className="text-sm font-medium">Goal milestone reached</p>
-                        <p className="text-xs text-gray-500">"My Creative Journey" reached 50% of goal • 1 day ago</p>
+                        <p className="text-xs text-gray-500">My Creative Journey reached 50% of goal • 1 day ago</p>
                       </div>
                       <Badge variant="secondary">50%</Badge>
                     </div>

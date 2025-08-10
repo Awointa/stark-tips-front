@@ -146,7 +146,7 @@ const CreateNewPage = ({pageName, setPageName, description, setDescription, goal
                 </CardHeader>
                 <CardContent className="text-blue-800 space-y-2 text-sm">
                   <p>
-                    ✅ <strong>Clear page name:</strong> Make it obvious what you're raising funds for
+                    ✅ <strong>Clear page name:</strong> Make it obvious what you&apos;re raising funds for
                   </p>
                   <p>
                     ✅ <strong>Compelling description:</strong> Explain your project and how tips help

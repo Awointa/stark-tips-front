@@ -5,7 +5,7 @@ import { Calendar, RefreshCw, TrendingUp, Users, DollarSign } from "lucide-react
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { useContract, useReadContract } from "@starknet-react/core"
-import { Contract } from "starknet"
+
 
 // Import your ABI
 import { MY_CONTRACT_ABI } from "@/constants/abi/MyContract" 
@@ -111,7 +111,7 @@ const Analytics = ({
                 const pageInfo = await contract.call("get_page_info", [pageId]) as ContractTipPage;
                 
                 // Get tips for this page to calculate tip count and amounts
-                const tips = await contract.call("get_tips_for_page", [pageId]) as Tip[];
+                // const tips = await contract.call("get_tips_for_page", [pageId]) as Tip[];
                 
                 pages.push({
                     id: pageInfo.id.toString(),

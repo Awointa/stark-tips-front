@@ -111,7 +111,7 @@ export default function TipSuccessPage({ params }: SuccessPageProps) {
                 <div className="text-left">
                   <span className="text-gray-600 block mb-2">Your Message</span>
                   <div className="bg-white p-3 rounded-lg border">
-                    <p className="text-gray-800">"{message}"</p>
+                    <p className="text-gray-800">&quot;{message}&quot;</p>
                   </div>
                 </div>
               )}
@@ -165,7 +165,7 @@ export default function TipSuccessPage({ params }: SuccessPageProps) {
             <CardContent className="p-6">
               <h3 className="font-semibold text-blue-900 mb-2">What happens next?</h3>
               <div className="text-sm text-blue-800 space-y-2">
-                <p>✅ Your tip has been sent directly to the creator's wallet</p>
+                <p>✅ Your tip has been sent directly to the creator&apos;s wallet</p>
                 <p>✅ The transaction is recorded on Starknet blockchain</p>
                 <p>✅ The creator will be notified of your support</p>
                 <p>💡 Consider following the creator for updates on their work!</p>

@@ -79,7 +79,7 @@ export default function TipAmountSelector({
               )}
             </div>
             {customAmount && Number.parseFloat(customAmount) > 0 && (
-              <p className="text-xs text-gray-600">That's approximately ${getAmountInUSD(customAmount)} USD</p>
+              <p className="text-xs text-gray-600">That&apos;s approximately ${getAmountInUSD(customAmount)} USD</p>
             )}
           </div>
         </CardContent>

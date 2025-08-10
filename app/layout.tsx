@@ -7,7 +7,6 @@ import Link from "next/link"
 import { Coins } from "lucide-react"
 import { StarknetProvider } from "@/components/starknet-provider";
 
-
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
