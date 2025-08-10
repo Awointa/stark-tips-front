@@ -3,9 +3,9 @@ import { Button } from "@/components/ui/button"
 import { BarChart3, Plus, Settings } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Copy, Eye, Share2 } from "lucide-react"
+import { Copy, Eye, Share2, Check } from "lucide-react"
 import Link from "next/link"
-
+import { useState } from "react"
 
 interface TipPage {
     id: string
@@ -19,6 +19,52 @@ interface TipPage {
 }
 
 const MyPages = ({tipPages, setActiveTab, copyLink, shareLink, togglePageStatus}: {tipPages: TipPage[], setActiveTab: (tab: string) => void, copyLink: (pageId: string) => void, shareLink: (pageId: string, pageName: string) => void, togglePageStatus: (pageId: string) => void}) => {
+    const [copiedPageId, setCopiedPageId] = useState<string | null>(null)
+
+    const handleCopyLink = async (pageId: string) => {
+        try {
+            // Generate the full URL for the tip page
+            const baseUrl = window.location.origin
+            const tipPageUrl = `${baseUrl}/tip/${pageId}`
+            
+            // Copy to clipboard
+            await navigator.clipboard.writeText(tipPageUrl)
+            
+            // Show success state
+            setCopiedPageId(pageId)
+            
+            // Reset success state after 2 seconds
+            setTimeout(() => {
+                setCopiedPageId(null)
+            }, 2000)
+            
+            // Call the original copyLink function if it exists
+            if (copyLink) {
+                copyLink(pageId)
+            }
+        } catch (error) {
+            console.error('Failed to copy link:', error)
+            // Fallback for browsers that don't support clipboard API
+            const textArea = document.createElement('textarea')
+            const baseUrl = window.location.origin
+            const tipPageUrl = `${baseUrl}/tip/${pageId}`
+            textArea.value = tipPageUrl
+            document.body.appendChild(textArea)
+            textArea.select()
+            document.execCommand('copy')
+            document.body.removeChild(textArea)
+            
+            // Show success state
+            setCopiedPageId(pageId)
+            setTimeout(() => {
+                setCopiedPageId(null)
+            }, 2000)
+            
+            if (copyLink) {
+                copyLink(pageId)
+            }
+        }
+    }
     
     return  (
                 <TabsContent value="pages" className="space-y-6">
@@ -34,7 +80,7 @@ const MyPages = ({tipPages, setActiveTab, copyLink, shareLink, togglePageStatus}
                 <Card>
                   <CardContent className="pt-6">
                     <div className="text-center text-gray-500">
-                      <p>You haven't created any tip pages yet.</p>
+                      <p>You haven&apos;t created any tip pages yet.</p>
                       <Button 
                         onClick={() => setActiveTab("create")} 
                         className="mt-4 bg-purple-600 hover:bg-purple-700"
@@ -75,9 +121,18 @@ const MyPages = ({tipPages, setActiveTab, copyLink, shareLink, togglePageStatus}
                             </Link>
                           </Button>
 
-                          <Button variant="outline" size="sm" onClick={() => copyLink(page.id)}>
-                            <Copy className="h-4 w-4 mr-2" />
-                            Copy Link
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => handleCopyLink(page.id)}
+                            className={copiedPageId === page.id ? "bg-green-50 border-green-200" : ""}
+                          >
+                            {copiedPageId === page.id ? (
+                              <Check className="h-4 w-4 mr-2 text-green-600" />
+                            ) : (
+                              <Copy className="h-4 w-4 mr-2" />
+                            )}
+                            {copiedPageId === page.id ? "Copied!" : "Copy Link"}
                           </Button>
 
                           <Button variant="outline" size="sm" onClick={() => shareLink(page.id, page.name)}>
