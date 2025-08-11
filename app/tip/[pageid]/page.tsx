@@ -103,9 +103,7 @@ export default function TipPage({ params }: TipPageProps) {
   const [txHash, setTxHash] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [needsApproval, setNeedsApproval] = useState(false)
   const [userBalance, setUserBalance] = useState<string>("0")
-  const [currentAllowance, setCurrentAllowance] = useState<string>("0")
 
   const { contract } = useContract({ 
     abi: MY_CONTRACT_ABI, 
@@ -128,17 +126,7 @@ export default function TipPage({ params }: TipPageProps) {
 
   const { toast } = useToast()
 
-  // Hook for approval transactions
-  const { 
-    send: sendApproval, 
-    data: approvalTxData, 
-    error: approvalError, 
-    isPending: isApprovalPending,
-    isSuccess: isApprovalSuccess,
-    isError: isApprovalError 
-  } = useSendTransaction({})
-
-  // Hook for tip transactions
+  // Hook for integrated transactions (approval + tip)
   const { 
     send: sendTip, 
     data: tipTxData, 
@@ -193,29 +181,6 @@ export default function TipPage({ params }: TipPageProps) {
     }
   }, [strkContract, address, weiToStrk])
 
-  // Check current allowance
-  const checkAllowance = useCallback(async () => {
-    if (!strkContract || !address) return
-    
-    try {
-      const allowance = await strkContract.call("allowance", [address, CONTRACT_ADDRESS])
-      const allowanceStr = Array.isArray(allowance) ? allowance[0]?.toString() : allowance?.toString()
-      if (allowanceStr) {
-        setCurrentAllowance(allowanceStr)
-        
-        const currentAmount = selectedAmount || customAmount
-        if (currentAmount && parseFloat(currentAmount) > 0) {
-          const requiredWei = BigInt(strkToWei(currentAmount))
-          const currentAllowanceWei = BigInt(allowanceStr)
-          setNeedsApproval(currentAllowanceWei < requiredWei)
-        }
-      }
-    } catch (error) {
-      console.error("Error checking allowance:", error)
-      setNeedsApproval(true)
-    }
-  }, [strkContract, address, selectedAmount, customAmount, strkToWei])
-
   // Connection status effect
   useEffect(() => {
     if (status === "disconnected") {
@@ -225,42 +190,12 @@ export default function TipPage({ params }: TipPageProps) {
     }
   }, [status])
 
-  // Check balance and allowance when connected
+  // Check balance when connected
   useEffect(() => {
     if (isConnected && address && strkContract) {
       checkBalance()
-      checkAllowance()
     }
-  }, [isConnected, address, strkContract, checkBalance, checkAllowance])
-
-  // Handle approval success
-  useEffect(() => {
-    if (isApprovalSuccess && approvalTxData) {
-      toast({
-        title: "Approval Successful! ✅",
-        description: "You can now send your tip",
-      })
-      
-      // Recheck allowance after approval
-      const timeoutId = setTimeout(() => {
-        checkAllowance()
-      }, 2000)
-      
-      return () => clearTimeout(timeoutId)
-    }
-  }, [isApprovalSuccess, approvalTxData, toast, checkAllowance])
-
-  // Handle approval error
-  useEffect(() => {
-    if (isApprovalError && approvalError) {
-      console.error('Approval error:', approvalError)
-      toast({
-        title: "Approval Failed ❌",
-        description: approvalError.message || "Failed to approve STRK spending",
-        variant: "destructive",
-      })
-    }
-  }, [isApprovalError, approvalError, toast])
+  }, [isConnected, address, strkContract, checkBalance])
 
   // Handle tip success
   useEffect(() => {
@@ -276,6 +211,11 @@ export default function TipPage({ params }: TipPageProps) {
         description: "Your tip has been sent to the creator",
       })
 
+      // Refresh balance
+      setTimeout(() => {
+        checkBalance()
+      }, 3000)
+
       // Reset after showing success
       const timeoutId = setTimeout(() => {
         setTransactionStatus("idle")
@@ -284,7 +224,7 @@ export default function TipPage({ params }: TipPageProps) {
       
       return () => clearTimeout(timeoutId)
     }
-  }, [isTipSuccess, tipTxData, toast])
+  }, [isTipSuccess, tipTxData, toast, checkBalance])
 
   // Handle tip error
   useEffect(() => {
@@ -361,8 +301,8 @@ export default function TipPage({ params }: TipPageProps) {
 
   // Update sending state
   useEffect(() => {
-    setIsSending(isTipPending || isApprovalPending)
-  }, [isTipPending, isApprovalPending])
+    setIsSending(isTipPending)
+  }, [isTipPending])
 
   const [recentTips] = useState<Tip[]>([
     {
@@ -400,54 +340,7 @@ export default function TipPage({ params }: TipPageProps) {
     { strk: "1.0", label: "Incredible", emoji: "🚀" },
   ]
 
-  // Handle STRK approval
-  const handleApprove = useCallback(async () => {
-    const amount = selectedAmount || customAmount
-    if (!amount || parseFloat(amount) < 0.01) {
-      toast({
-        title: "Invalid Amount ❌",
-        description: "Minimum tip amount is 0.01 STRK",
-        variant: "destructive",
-      })
-      return
-    }
-
-    if (!strkContract || !address) {
-      toast({
-        title: "Contract Error ❌",
-        description: "STRK token contract not available or wallet not connected",
-        variant: "destructive",
-      })
-      return
-    }
-
-    try {
-      console.log('Starting approval process...')
-      const amountInWei = strkToWei(amount)
-      console.log('Approving amount:', amount, 'STRK =', amountInWei, 'wei')
-      
-      // Create approval call
-      const approvalCall = strkContract.populate("approve", [
-        CONTRACT_ADDRESS,
-        uint256.bnToUint256(BigInt(amountInWei))
-      ])
-      
-      console.log('Approval call created:', approvalCall)
-      
-      // Send approval transaction
-      sendApproval([approvalCall])
-      
-    } catch (error) {
-      console.error("Approval preparation error:", error)
-      toast({
-        title: "Approval Error ❌",
-        description: "Failed to prepare approval transaction",
-        variant: "destructive",
-      })
-    }
-  }, [selectedAmount, customAmount, strkContract, address, strkToWei, sendApproval, toast])
-
-  // Handle sending tip
+  // Integrated handle sending tip (includes approval + tip in single transaction)
   const handleSendTip = useCallback(async () => {
     const amount = selectedAmount || customAmount
     if (!amount || parseFloat(amount) <= 0) {
@@ -477,10 +370,10 @@ export default function TipPage({ params }: TipPageProps) {
       return
     }
 
-    if (!contract) {
+    if (!contract || !strkContract) {
       toast({
         title: "Contract Error ❌",
-        description: "StarkTips contract not initialized",
+        description: "Contracts not initialized",
         variant: "destructive",
       })
       return
@@ -493,15 +386,6 @@ export default function TipPage({ params }: TipPageProps) {
       toast({
         title: "Insufficient Balance ❌",
         description: `You need at least ${amount} STRK. Your balance: ${userBalance} STRK`,
-        variant: "destructive",
-      })
-      return
-    }
-
-    if (needsApproval) {
-      toast({
-        title: "Approval Required ❌",
-        description: "Please approve STRK spending first",
         variant: "destructive",
       })
       return
@@ -522,28 +406,37 @@ export default function TipPage({ params }: TipPageProps) {
 
       const amountInWei = BigInt(strkToWei(amount))
       
-      console.log('Sending tip with params:', {
+      console.log('Sending integrated tip with params:', {
         pageId: Number(id),
         amount: amountInWei.toString(),
         message: message
       })
 
-      // Prepare the contract call
-      const calls = [
-        contract.populate("send_tip", [
-          Number(id), // page_id
-          uint256.bnToUint256(amountInWei), // amount as uint256
-          message || "" // message
-        ])
-      ]
+      // Create multicall with both approval and tip sending
+      const calls = []
 
-      console.log('Tip call prepared:', calls)
+      // First call: Approve STRK spending (always include to ensure sufficient allowance)
+      const approvalCall = strkContract.populate("approve", [
+        CONTRACT_ADDRESS,
+        uint256.bnToUint256(amountInWei)
+      ])
+      calls.push(approvalCall)
 
-      // Send the transaction
+      // Second call: Send the tip
+      const tipCall = contract.populate("send_tip", [
+        Number(id), // page_id
+        uint256.bnToUint256(amountInWei), // amount as uint256
+        message || "" // message
+      ])
+      calls.push(tipCall)
+
+      console.log('Integrated calls prepared:', calls)
+
+      // Send both transactions in a single multicall
       sendTip(calls)
       
     } catch (error) {
-      console.error('Error preparing tip transaction:', error)
+      console.error('Error preparing integrated transaction:', error)
       setTransactionStatus("error")
       setIsSending(false)
       
@@ -565,8 +458,8 @@ export default function TipPage({ params }: TipPageProps) {
     isConnected,
     address,
     contract,
+    strkContract,
     userBalance,
-    needsApproval,
     id,
     message,
     strkToWei,
@@ -733,11 +626,6 @@ export default function TipPage({ params }: TipPageProps) {
                       <p className="text-sm text-blue-700">
                         Your STRK Balance: <span className="font-semibold">{userBalance} STRK</span>
                       </p>
-                      {currentAllowance && (
-                        <p className="text-xs text-blue-600 mt-1">
-                          Current Allowance: {weiToStrk(currentAllowance)} STRK
-                        </p>
-                      )}
                     </div>
                   )}
 
@@ -770,9 +658,7 @@ export default function TipPage({ params }: TipPageProps) {
                                     : "text-red-800"
                               }`}
                             >
-                              {transactionStatus === "pending" && 
-                                (isApprovalPending ? "Approving STRK spending..." : "Sending your tip...")
-                              }
+                              {transactionStatus === "pending" && "Processing your tip..."}
                               {transactionStatus === "success" && "Tip sent successfully! 🎉"}
                               {transactionStatus === "error" && "Transaction failed"}
                             </p>
@@ -852,36 +738,17 @@ export default function TipPage({ params }: TipPageProps) {
                     <p className="text-xs text-gray-500 text-right">{message.length}/280 characters</p>
                   </div>
 
-                  {/* Approve Button (shows when approval needed) */}
-                  {needsApproval && currentAmount && parseFloat(currentAmount) >= 0.01 && (
-                    <Button
-                      onClick={handleApprove}
-                      disabled={isApprovalPending || !isConnected}
-                      className="w-full bg-yellow-500 hover:bg-yellow-600"
-                      size="lg"
-                    >
-                      {isApprovalPending ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Approving STRK Spending...
-                        </>
-                      ) : (
-                        `Approve ${currentAmount} STRK Spending`
-                      )}
-                    </Button>
-                  )}
-
-                  {/* Send Tip Button */}
+                  {/* Send Tip Button - Now handles both approval and tip in one transaction */}
                   <Button
                     onClick={handleSendTip}
-                    disabled={isButtonDisabled || needsApproval}
+                    disabled={isButtonDisabled}
                     className="w-full bg-purple-600 hover:bg-purple-700"
                     size="lg"
                   >
-                    {(isSending || isTipPending) ? (
+                    {isSending ? (
                       <>
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        {isTipPending ? "Sending tip..." : "Preparing transaction..."}
+                        Processing tip...
                       </>
                     ) : (
                       `Send Tip ${currentAmount ? `(${currentAmount} STRK)` : ""}`
@@ -892,9 +759,9 @@ export default function TipPage({ params }: TipPageProps) {
                     <p className="text-sm text-gray-500 text-center">Connect your Starknet wallet to send a tip</p>
                   )}
 
-                  {needsApproval && currentAmount && (
-                    <p className="text-sm text-yellow-600 text-center">⚠️ Please approve STRK spending before sending tip</p>
-                  )}
+                  <div className="text-xs text-gray-500 text-center bg-gray-50 p-2 rounded">
+                    ℹ️ This transaction will automatically approve and send your tip in a single signature
+                  </div>
                 </CardContent>
                 
               </Card>
