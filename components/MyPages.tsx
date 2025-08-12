@@ -3,9 +3,13 @@ import { Button } from "@/components/ui/button"
 import { BarChart3, Plus, Settings } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Copy, Eye, Share2, Check } from "lucide-react"
+import { Copy, Eye, Check } from "lucide-react"
 import Link from "next/link"
 import { useState } from "react"
+import { useSendTransaction, useContract } from "@starknet-react/core"
+import { MY_CONTRACT_ABI } from "@/constants/abi/MyContract"
+import { CONTRACT_ADDRESS } from "@/constants"
+
 
 interface TipPage {
     id: string
@@ -18,8 +22,46 @@ interface TipPage {
     goal?: string
 }
 
-const MyPages = ({tipPages, setActiveTab, copyLink, shareLink, togglePageStatus}: {tipPages: TipPage[], setActiveTab: (tab: string) => void, copyLink: (pageId: string) => void, shareLink: (pageId: string, pageName: string) => void, togglePageStatus: (pageId: string) => void}) => {
+const MyPages = ({tipPages, setActiveTab, shareLink}: {
+    tipPages: TipPage[], 
+    setActiveTab: (tab: string) => void, 
+    shareLink: (pageId: string, pageName: string) => void
+}) => {
     const [copiedPageId, setCopiedPageId] = useState<string | null>(null)
+
+    // Contract instance
+    const { contract } = useContract({
+        abi: MY_CONTRACT_ABI,
+        address: CONTRACT_ADDRESS,
+    })
+
+    // Send transaction hook for contract interactions
+    const { sendAsync, isPending} = useSendTransaction({})
+
+    const handleTogglePageStatus = async (pageId: string, isActive: boolean) => {
+        if (!contract) {
+            console.error('Contract not available')
+            return
+        }
+
+        try {
+            // Choose the appropriate function based on current status
+            const functionName = isActive ? 'deactivate_page' : 'activate_page'
+            
+            // Use contract.populate to create the call with type safety
+            const call = contract.populate(functionName, [pageId])
+
+            // Execute the transaction
+            const result = await sendAsync([call])
+            
+            console.log(`Page ${isActive ? 'deactivated' : 'activated'} successfully:`, result)
+            
+        } catch (error) {
+            console.error(`Failed to ${isActive ? 'deactivate' : 'activate'} page:`, error)
+            // You might want to show a toast notification here
+            alert(`Failed to ${isActive ? 'deactivate' : 'activate'} page. Please try again.`)
+        }
+    }
 
     const handleCopyLink = async (pageId: string) => {
         try {
@@ -38,10 +80,6 @@ const MyPages = ({tipPages, setActiveTab, copyLink, shareLink, togglePageStatus}
                 setCopiedPageId(null)
             }, 2000)
             
-            // Call the original copyLink function if it exists
-            if (copyLink) {
-                copyLink(pageId)
-            }
         } catch (error) {
             console.error('Failed to copy link:', error)
             // Fallback for browsers that don't support clipboard API
@@ -59,10 +97,12 @@ const MyPages = ({tipPages, setActiveTab, copyLink, shareLink, togglePageStatus}
             setTimeout(() => {
                 setCopiedPageId(null)
             }, 2000)
-            
-            if (copyLink) {
-                copyLink(pageId)
-            }
+        }
+    }
+
+    const handleShareLink = (pageId: string, pageName: string) => {
+        if (shareLink) {
+            shareLink(pageId, pageName)
         }
     }
     
@@ -135,8 +175,12 @@ const MyPages = ({tipPages, setActiveTab, copyLink, shareLink, togglePageStatus}
                             {copiedPageId === page.id ? "Copied!" : "Copy Link"}
                           </Button>
 
-                          <Button variant="outline" size="sm" onClick={() => shareLink(page.id, page.name)}>
-                            <Share2 className="h-4 w-4 mr-2" />
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => handleShareLink(page.id, page.name)}
+                          >
+                            <BarChart3 className="h-4 w-4 mr-2" />
                             Share
                           </Button>
 
@@ -145,9 +189,17 @@ const MyPages = ({tipPages, setActiveTab, copyLink, shareLink, togglePageStatus}
                             Analytics
                           </Button>
 
-                          <Button variant="outline" size="sm" onClick={() => togglePageStatus(page.id)}>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => handleTogglePageStatus(page.id, page.isActive)}
+                            disabled={isPending}
+                          >
                             <Settings className="h-4 w-4 mr-2" />
-                            {page.isActive ? "Deactivate" : "Activate"}
+                            {isPending 
+                              ? "Processing..." 
+                              : page.isActive ? "Deactivate" : "Activate"
+                            }
                           </Button>
                         </div>
 
@@ -168,7 +220,7 @@ const MyPages = ({tipPages, setActiveTab, copyLink, shareLink, togglePageStatus}
                               ></div>
                             </div>
                             <p className="text-xs text-gray-500 mt-1">
-                              {page.totalAmount} ETH of {page.goal} ETH goal
+                              {page.totalAmount} STRK of {page.goal} STRK goal
                             </p>
                           </div>
                         )}
