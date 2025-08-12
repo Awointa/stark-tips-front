@@ -18,6 +18,7 @@ import {
   CheckCircle,
   AlertCircle,
   ArrowLeft,
+  Check,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import WalletConnect from "@/components/wallet-connect"
@@ -107,6 +108,9 @@ export default function TipPage({ params }: TipPageProps) {
   const [strkPrice, setStrkPrice] = useState<number>(0)
   const [isPriceLoading, setIsPriceLoading] = useState(true)
   const [recentTips, setRecentTips] = useState<Tip[]>([])
+  
+  // Copy states for visual feedback
+  const [copiedStates, setCopiedStates] = useState<{[key: string]: boolean}>({})
 
   const { contract } = useContract({ 
     abi: MY_CONTRACT_ABI, 
@@ -158,6 +162,35 @@ export default function TipPage({ params }: TipPageProps) {
     total_amount_recieved: 0,
     total_tips_recieved: 0,
   })
+
+  // Enhanced copy function with visual feedback
+  const copyToClipboard = useCallback(async (text: string, key: string, successMessage: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      
+      // Set copied state for visual feedback
+      setCopiedStates(prev => ({ ...prev, [key]: true }))
+      
+      toast({
+        title: successMessage,
+        description: "Copied to clipboard",
+        duration: 2000,
+      })
+      
+      // Reset copied state after 2 seconds
+      setTimeout(() => {
+        setCopiedStates(prev => ({ ...prev, [key]: false }))
+      }, 2000)
+      
+    } catch (error) {
+      console.error('Failed to copy to clipboard:', error)
+      toast({
+        title: "Copy Failed",
+        description: "Unable to copy to clipboard",
+        variant: "destructive",
+      })
+    }
+  }, [toast])
 
   // Helper functions (memoized to prevent unnecessary re-renders)
   const strkToWei = useCallback((strk: string): string => {
@@ -522,33 +555,59 @@ export default function TipPage({ params }: TipPageProps) {
     toast
   ])
 
-  const shareLink = useCallback(() => {
-    const url = `${window.location.origin}/tip/${params.id}`
-    const text = `Support ${pageData.name} on StarkTips! 💜`
+  // Enhanced share function
+  // const shareLink = useCallback(() => {
+  //   if (!id) {
+  //     toast({
+  //       title: "Error",
+  //       description: "Page ID not found",
+  //       variant: "destructive",
+  //     })
+  //     return
+  //   }
+    
+  //   const url = `${window.location.origin}/tip/${id}`
+  //   const text = `Support ${pageData.name} on StarkTips! 💜`
 
-    if (navigator.share) {
-      navigator.share({
-        title: `Support ${pageData.name}`,
-        text: text,
-        url: url,
-      })
-    } else {
-      navigator.clipboard.writeText(`${text} ${url}`)
-      toast({
-        title: "Share Link Copied! 📱",
-        description: "Share text with link copied to clipboard",
-      })
-    }
-  }, [params.id, pageData.name, toast])
+  //   if (navigator.share) {
+  //     navigator.share({
+  //       title: `Support ${pageData.name}`,
+  //       text: text,
+  //       url: url,
+  //     }).catch(err => {
+  //       console.log('Error sharing:', err)
+  //       // Fallback to copying
+  //       copyToClipboard(`${text} ${url}`, 'share', 'Share Link Copied! 📱')
+  //     })
+  //   } else {
+  //     copyToClipboard(`${text} ${url}`, 'share', 'Share Link Copied! 📱')
+  //   }
+  // }, [id, pageData.name, copyToClipboard, toast])
 
+  // Enhanced copy link function
   const copyLink = useCallback(() => {
-    const url = `${window.location.origin}/tip/${params.id}`
-    navigator.clipboard.writeText(url)
-    toast({
-      title: "Link Copied! 📋",
-      description: "Tip page link copied to clipboard",
-    })
-  }, [params.id, toast])
+    if (!id) {
+      toast({
+        title: "Error",
+        description: "Page ID not found",
+        variant: "destructive",
+      })
+      return
+    }
+    
+    const url = `${window.location.origin}/tip/${id}`
+    copyToClipboard(url, 'link', 'Link Copied! 📋')
+  }, [id, copyToClipboard, toast])
+
+  // Copy wallet address function
+  const copyAddress = useCallback((address: string) => {
+    copyToClipboard(address, `address-${address}`, 'Address Copied! 📋')
+  }, [copyToClipboard])
+
+  // Copy transaction hash function
+  const copyTxHash = useCallback((txHash: string) => {
+    copyToClipboard(txHash, `tx-${txHash}`, 'Transaction Hash Copied! 📋')
+  }, [copyToClipboard])
 
   const formatTimeAgo = useCallback((timestamp: number) => {
     const diff = Date.now() - timestamp
@@ -622,13 +681,17 @@ export default function TipPage({ params }: TipPageProps) {
             </div>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={copyLink}>
-                <Copy className="h-4 w-4 mr-2" />
+                {copiedStates['link'] ? (
+                  <Check className="h-4 w-4 mr-2 text-green-600" />
+                ) : (
+                  <Copy className="h-4 w-4 mr-2" />
+                )}
                 Copy Link
               </Button>
-              <Button variant="outline" size="sm" onClick={shareLink}>
+              {/* <Button variant="outline" size="sm" onClick={shareLink}>
                 <Share2 className="h-4 w-4 mr-2" />
                 Share
-              </Button>
+              </Button> */}
             </div>
           </div>
         </div>
@@ -738,9 +801,23 @@ export default function TipPage({ params }: TipPageProps) {
                               {transactionStatus === "error" && "Transaction failed"}
                             </p>
                             {txHash && txHash !== "pending..." && (
-                              <p className="text-sm text-gray-600 font-mono break-all">
-                                Tx: {txHash.slice(0, 20)}...
-                              </p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <p className="text-sm text-gray-600 font-mono break-all">
+                                  Tx: {txHash.slice(0, 20)}...
+                                </p>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 px-2"
+                                  onClick={() => copyTxHash(txHash)}
+                                >
+                                  {copiedStates[`tx-${txHash}`] ? (
+                                    <Check className="h-3 w-3 text-green-600" />
+                                  ) : (
+                                    <Copy className="h-3 w-3" />
+                                  )}
+                                </Button>
+                              </div>
                             )}
                           </div>
                         </div>
@@ -865,11 +942,25 @@ export default function TipPage({ params }: TipPageProps) {
                     recentTips.map((tip) => (
                       <div key={tip.id} className="border-b border-gray-100 pb-4 last:border-b-0">
                         <div className="flex justify-between items-start">
-                          <span className="text-sm font-mono text-gray-500">
-                            {typeof tip.sender === 'string' && tip.sender.length > 10 
-                              ? `${tip.sender.slice(0, 6)}...${tip.sender.slice(-4)}`
-                              : tip.sender || "Unknown"}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-mono text-gray-500">
+                              {typeof tip.sender === 'string' && tip.sender.length > 10 
+                                ? `${tip.sender.slice(0, 6)}...${tip.sender.slice(-4)}`
+                                : tip.sender || "Unknown"}
+                            </span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 px-2"
+                              onClick={() => copyAddress(tip.sender)}
+                            >
+                              {copiedStates[`address-${tip.sender}`] ? (
+                                <Check className="h-3 w-3 text-green-600" />
+                              ) : (
+                                <Copy className="h-3 w-3" />
+                              )}
+                            </Button>
+                          </div>
                           <div className="text-right">
                             <Badge variant="secondary" className="">
                               {Number(tip.amount).toFixed(1)} STRK
@@ -880,15 +971,29 @@ export default function TipPage({ params }: TipPageProps) {
                           </div>
                         </div>
                         {tip.message && (
-                          <p className="text-sm text-gray-700 bg-gray-50 p-2 rounded">&quot;{tip.message}&quot;</p>
+                          <p className="text-sm text-gray-700 bg-gray-50 p-2 rounded mt-2">&quot;{tip.message}&quot;</p>
                         )}
-                        <div className="flex justify-between items-center">
+                        <div className="flex justify-between items-center mt-2">
                           <span className="text-xs text-gray-400">{formatTimeAgo(tip.timestamp)}</span>
                           {tip.txHash && tip.txHash !== "pending..." && (
-                            <Button variant="ghost" size="sm" className="h-6 px-2 text-xs">
-                              <ExternalLink className="h-3 w-3 mr-1" />
-                              View Tx
-                            </Button>
+                            <div className="flex items-center gap-1">
+                              <Button variant="ghost" size="sm" className="h-6 px-2 text-xs">
+                                <ExternalLink className="h-3 w-3 mr-1" />
+                                View Tx
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 px-2"
+                                onClick={() => copyTxHash(tip.txHash!)}
+                              >
+                                {copiedStates[`tx-${tip.txHash}`] ? (
+                                  <Check className="h-3 w-3 text-green-600" />
+                                ) : (
+                                  <Copy className="h-3 w-3" />
+                                )}
+                              </Button>
+                            </div>
                           )}
                         </div>
                       </div>
