@@ -104,6 +104,9 @@ export default function TipPage({ params }: TipPageProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [userBalance, setUserBalance] = useState<string>("0")
+  const [strkPrice, setStrkPrice] = useState<number>(0)
+  const [isPriceLoading, setIsPriceLoading] = useState(true)
+  const [recentTips, setRecentTips] = useState<Tip[]>([])
 
   const { contract } = useContract({ 
     abi: MY_CONTRACT_ABI, 
@@ -119,6 +122,15 @@ export default function TipPage({ params }: TipPageProps) {
   const { data, isLoading: contractLoading, error: contractError } = useReadContract({
     abi: MY_CONTRACT_ABI,
     functionName: "get_page_info",
+    address: CONTRACT_ADDRESS,
+    args: id ? [Number(id)] : undefined,
+    enabled: Boolean(id)
+  })
+
+  // Updated to use get_tips_for_page instead of get_recent_tips
+  const {data: tipsForPage, isLoading: tipsLoading, error: tipsError} = useReadContract({
+    abi: MY_CONTRACT_ABI,
+    functionName: "get_tips_for_page",
     address: CONTRACT_ADDRESS,
     args: id ? [Number(id)] : undefined,
     enabled: Boolean(id)
@@ -166,6 +178,66 @@ export default function TipPage({ params }: TipPageProps) {
     }
   }, [])
 
+  // Process tips data when tipsForPage changes
+  useEffect(() => {
+    if (tipsForPage && Array.isArray(tipsForPage)) {
+      const processedTips: Tip[] = tipsForPage
+        .map((tip: any) => ({
+          id: tip.id?.toString() || Math.random().toString(),
+          sender: tip.sender?.toString() || "Unknown",
+          amount: weiToStrk(tip.amount?.toString() || "0"),
+          message: tip.message?.toString() || "",
+          timestamp: Number(tip.timestamp) * 1000, // Convert to milliseconds
+          txHash: undefined // You might want to store this in your contract
+        }))
+        .sort((a, b) => b.timestamp - a.timestamp) // Sort by most recent first
+        .slice(0, 10) // Limit to 10 most recent tips
+      
+      setRecentTips(processedTips)
+    } else if (!tipsLoading && !tipsError) {
+      setRecentTips([]) // No tips found
+    }
+  }, [tipsForPage, weiToStrk, tipsLoading, tipsError])
+
+  // Fetch STRK price from CoinGecko
+  const fetchStrkPrice = useCallback(async () => {
+    try {
+      setIsPriceLoading(true)
+      const response = await fetch(
+        'https://api.coingecko.com/api/v3/simple/price?ids=starknet&vs_currencies=usd',
+        {
+          headers: {
+            'Accept': 'application/json',
+          }
+        }
+      )
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      
+      if (data.starknet && data.starknet.usd) {
+        setStrkPrice(data.starknet.usd)
+        console.log('STRK price updated:', data.starknet.usd)
+      } else {
+        throw new Error('Invalid price data structure')
+      }
+    } catch (error) {
+      console.error('Error fetching STRK price:', error)
+      // Fallback to a default price if API fails
+      setStrkPrice(0.5) // Fallback price
+      toast({
+        title: "Price Update Failed",
+        description: "Using fallback STRK price. Prices may not be accurate.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsPriceLoading(false)
+    }
+  }, [toast])
+
   // Check user's STRK balance
   const checkBalance = useCallback(async () => {
     if (!strkContract || !address) return
@@ -180,6 +252,16 @@ export default function TipPage({ params }: TipPageProps) {
       console.error("Error checking balance:", error)
     }
   }, [strkContract, address, weiToStrk])
+
+  // Fetch price on component mount and set up periodic updates
+  useEffect(() => {
+    fetchStrkPrice()
+    
+    // Update price every 5 minutes
+    const priceInterval = setInterval(fetchStrkPrice, 5 * 60 * 1000)
+    
+    return () => clearInterval(priceInterval)
+  }, [fetchStrkPrice])
 
   // Connection status effect
   useEffect(() => {
@@ -304,40 +386,13 @@ export default function TipPage({ params }: TipPageProps) {
     setIsSending(isTipPending)
   }, [isTipPending])
 
-  const [recentTips] = useState<Tip[]>([
-    {
-      id: "1",
-      sender: "0x1234...5678",
-      amount: "0.1",
-      message: "Love your work! Keep it up! 🎨",
-      timestamp: Date.now() - 3600000,
-      txHash: "0xabc123...",
-    },
-    {
-      id: "2",
-      sender: "0x9876...4321",
-      amount: "0.05",
-      message: "Amazing art style!",
-      timestamp: Date.now() - 7200000,
-      txHash: "0xdef456...",
-    },
-    {
-      id: "3",
-      sender: "0x5555...7777",
-      amount: "0.2",
-      message: "Your tutorials helped me so much. Thank you! 🙏",
-      timestamp: Date.now() - 10800000,
-      txHash: "0x789xyz...",
-    },
-  ])
-
   const quickAmounts = [
-    { strk: "0.01", label: "Coffee", emoji: "☕" },
-    { strk: "0.05", label: "Snack", emoji: "🍕" },
-    { strk: "0.1", label: "Lunch", emoji: "🍔" },
-    { strk: "0.25", label: "Generous", emoji: "💝" },
-    { strk: "0.5", label: "Amazing", emoji: "🌟" },
-    { strk: "1.0", label: "Incredible", emoji: "🚀" },
+    { strk: "10", label: "Coffee", emoji: "☕" },
+    { strk: "15", label: "Snack", emoji: "🍕" },
+    { strk: "20", label: "Lunch", emoji: "🍔" },
+    { strk: "25", label: "Generous", emoji: "💝" },
+    { strk: "50", label: "Amazing", emoji: "🌟" },
+    { strk: "100", label: "Incredible", emoji: "🚀" },
   ]
 
   // Integrated handle sending tip (includes approval + tip in single transaction)
@@ -507,10 +562,12 @@ export default function TipPage({ params }: TipPageProps) {
     return `${days}d ago`
   }, [])
 
-  const getAmountInUSD = useCallback((ethAmount: string) => {
-    const ethToUsd = 2000
-    return (parseFloat(ethAmount) * ethToUsd).toFixed(2)
-  }, [])
+  const getAmountInUSD = useCallback((strkAmount: string) => {
+    if (isPriceLoading) return "..."
+    const amount = parseFloat(strkAmount)
+    if (isNaN(amount) || strkPrice === 0) return "0.00"
+    return (amount * strkPrice).toFixed(2)
+  }, [strkPrice, isPriceLoading])
 
   // Button disabled state
   const isButtonDisabled = isSending || !isConnected || !contract
@@ -554,10 +611,10 @@ export default function TipPage({ params }: TipPageProps) {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Link href="/">
+              <Link href="/dashboard">
                 <Button variant="ghost" size="sm">
                   <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back to StarkTips
+                  Back to Dashboard
                 </Button>
               </Link>
               <div className="h-6 w-px bg-gray-300" />
@@ -594,7 +651,14 @@ export default function TipPage({ params }: TipPageProps) {
                       <div className="flex items-center gap-4 text-sm text-gray-600 mb-3">
                         <span className="flex items-center gap-1">
                           <Heart className="h-4 w-4 text-red-500" />
-                          {pageData.total_amount_recieved} STRK raised
+                          {(() => {
+                                const value = Number(pageData.total_amount_recieved) / 1e18; // from wei to STRK
+
+                                if (value >= 100) return value.toFixed(0);     // No decimals for big numbers
+                                if (value >= 1) return value.toFixed(0);       // 2 decimals for normal amounts
+                                return value.toPrecision(3);                   // Small numbers keep 3 significant digits
+                              })()}
+                              STRK raised
                         </span>
                         <span className="flex items-center gap-1">
                           <Users className="h-4 w-4 text-blue-500" />
@@ -623,9 +687,20 @@ export default function TipPage({ params }: TipPageProps) {
                   {/* User Balance Display */}
                   {isConnected && userBalance && (
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                      <p className="text-sm text-blue-700">
-                        Your STRK Balance: <span className="font-semibold">{userBalance} STRK</span>
-                      </p>
+                      <div className="flex justify-between items-center">
+                        <p className="text-sm text-blue-700">
+                          Your STRK Balance: <span className="font-semibold">{userBalance} STRK</span>
+                        </p>
+                        <p className="text-xs text-blue-600">
+                          ≈ ${getAmountInUSD(userBalance)}
+                        </p>
+                      </div>
+                      {isPriceLoading && (
+                        <p className="text-xs text-blue-500 mt-1">
+                          <Loader2 className="h-3 w-3 inline animate-spin mr-1" />
+                          Updating price...
+                        </p>
+                      )}
                     </div>
                   )}
 
@@ -675,7 +750,14 @@ export default function TipPage({ params }: TipPageProps) {
 
                   {/* Quick Amount Selection */}
                   <div className="space-y-3">
-                    <Label>Choose Tip Amount</Label>
+                    <div className="flex justify-between items-center">
+                      <Label>Choose Tip Amount</Label>
+                      {!isPriceLoading && strkPrice > 0 && (
+                        <p className="text-xs text-gray-500">
+                          1 STRK = ${strkPrice.toFixed(4)}
+                        </p>
+                      )}
+                    </div>
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                       {quickAmounts.map((amount) => (
                         <Button
@@ -690,7 +772,9 @@ export default function TipPage({ params }: TipPageProps) {
                         >
                           <div className="text-lg">{amount.emoji}</div>
                           <div className="font-semibold">{amount.strk} STRK</div>
-                          <div className="text-xs opacity-70">${getAmountInUSD(amount.strk)}</div>
+                          <div className="text-xs opacity-70">
+                            ${isPriceLoading ? "..." : getAmountInUSD(amount.strk)}
+                          </div>
                           <div className="text-xs opacity-60">{amount.label}</div>
                         </Button>
                       ))}
@@ -717,7 +801,7 @@ export default function TipPage({ params }: TipPageProps) {
                       />
                       {customAmount && (
                         <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm text-gray-500">
-                          ${getAmountInUSD(customAmount)}
+                          ${isPriceLoading ? "..." : getAmountInUSD(customAmount)}
                         </div>
                       )}
                     </div>
@@ -763,7 +847,6 @@ export default function TipPage({ params }: TipPageProps) {
                     ℹ️ This transaction will automatically approve and send your tip in a single signature
                   </div>
                 </CardContent>
-                
               </Card>
             </div>
 
@@ -778,31 +861,45 @@ export default function TipPage({ params }: TipPageProps) {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4 max-h-96 overflow-y-auto">
-                  {recentTips.map((tip) => (
-                    <div key={tip.id} className="border-b border-gray-100 pb-4 last:border-b-0">
-                      <div className="flex justify-between items-start mb-2">
-                        <span className="text-sm font-mono text-gray-500">{tip.sender}</span>
-                        <div className="text-right">
-                          <Badge variant="secondary" className="mb-1">
-                            {tip.amount} STRK
-                          </Badge>
-                          <p className="text-xs text-gray-400">${getAmountInUSD(tip.amount)}</p>
+                  {recentTips.length > 0 ? (
+                    recentTips.map((tip) => (
+                      <div key={tip.id} className="border-b border-gray-100 pb-4 last:border-b-0">
+                        <div className="flex justify-between items-start">
+                          <span className="text-sm font-mono text-gray-500">
+                            {typeof tip.sender === 'string' && tip.sender.length > 10 
+                              ? `${tip.sender.slice(0, 6)}...${tip.sender.slice(-4)}`
+                              : tip.sender || "Unknown"}
+                          </span>
+                          <div className="text-right">
+                            <Badge variant="secondary" className="">
+                              {Number(tip.amount).toFixed(1)} STRK
+                            </Badge>
+                            <p className="text-xs text-gray-400">
+                              ${isPriceLoading ? "..." : getAmountInUSD(tip.amount)}
+                            </p>
+                          </div>
+                        </div>
+                        {tip.message && (
+                          <p className="text-sm text-gray-700 bg-gray-50 p-2 rounded">&quot;{tip.message}&quot;</p>
+                        )}
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs text-gray-400">{formatTimeAgo(tip.timestamp)}</span>
+                          {tip.txHash && tip.txHash !== "pending..." && (
+                            <Button variant="ghost" size="sm" className="h-6 px-2 text-xs">
+                              <ExternalLink className="h-3 w-3 mr-1" />
+                              View Tx
+                            </Button>
+                          )}
                         </div>
                       </div>
-                      {tip.message && (
-                        <p className="text-sm text-gray-700 mb-2 bg-gray-50 p-2 rounded">&quot;{tip.message}&quot;</p>
-                      )}
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs text-gray-400">{formatTimeAgo(tip.timestamp)}</span>
-                        {tip.txHash && tip.txHash !== "pending..." && (
-                          <Button variant="ghost" size="sm" className="h-6 px-2 text-xs">
-                            <ExternalLink className="h-3 w-3 mr-1" />
-                            View Tx
-                          </Button>
-                        )}
-                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      <MessageCircle className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">No tips yet</p>
+                      <p className="text-xs opacity-75">Be the first to support this creator!</p>
                     </div>
-                  ))}
+                  )}
                 </CardContent>
               </Card>
 
@@ -812,30 +909,72 @@ export default function TipPage({ params }: TipPageProps) {
                   <CardTitle>Support Statistics</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="flex justify-between">
+                <div className="flex justify-between">
                     <span className="text-gray-600">Total Raised</span>
                     <div className="text-right">
-                      <span className="font-semibold">{pageData.total_amount_recieved} STRK</span>
-                      <p className="text-xs text-gray-500">${getAmountInUSD(String(pageData.total_amount_recieved))}</p>
+                      <span className="font-semibold">
+                        {(() => {
+                          const value = Number(pageData.total_amount_recieved) / 1e18; // convert from wei to STRK
+                          if (value >= 100) return `${value.toFixed(0)} STRK`;
+                          if (value >= 1) return `${value.toFixed(2)} STRK`;
+                          return `${value.toPrecision(3)} STRK`;
+                        })()}
+                      </span>
+                      <p className="text-xs text-gray-500">
+                        ${
+                          (() => {
+                            const usdValue = Number(getAmountInUSD(String(Number(pageData.total_amount_recieved) / 1e18)));
+                            if (usdValue >= 100) return usdValue.toFixed(0);
+                            if (usdValue >= 1) return usdValue.toFixed(2);
+                            return usdValue.toPrecision(3);
+                          })()
+                        }
+                      </p>
                     </div>
                   </div>
+
                   <div className="flex justify-between">
                     <span className="text-gray-600">Total Tips</span>
                     <span className="font-semibold">{pageData.total_tips_recieved}</span>
                   </div>
+
                   <div className="flex justify-between">
                     <span className="text-gray-600">Average Tip</span>
                     <div className="text-right">
-                      <span className="font-semibold">
-                        {pageData.total_tips_recieved > 0 
-                          ? (parseFloat(String(pageData.total_amount_recieved)) / parseFloat(String(pageData.total_tips_recieved))).toFixed(3)
-                          : "0"} STRK
+                    <span className="font-semibold">
+                        {pageData.total_tips_recieved > 0
+                          ? (() => {
+                              // Average per tip in STRK
+                              const value =
+                                (Number(pageData.total_amount_recieved) / 1e18) /
+                                Number(pageData.total_tips_recieved);
+
+                              if (value >= 100) return `${value.toFixed(0)} STRK`;   // Big numbers: no decimals
+                              if (value >= 1) return `${value.toFixed(2)} STRK`;     // Normal: 2 decimals
+                              return `${value.toPrecision(3)} STRK`;                 // Small: 3 significant digits
+                            })()
+                          : "0 STRK"}
                       </span>
+
                       <p className="text-xs text-gray-500">
-                        ${pageData.total_tips_recieved > 0
-                          ? ((parseFloat(String(pageData.total_amount_recieved)) / parseFloat(String(pageData.total_tips_recieved))) * 2000).toFixed(2)
-                          : "0.00"}
+                        ${
+                          pageData.total_tips_recieved > 0
+                            ? (() => {
+                                // Average per tip in STRK → USD
+                                const avgStrk =
+                                  (Number(pageData.total_amount_recieved) / 1e18) /
+                                  Number(pageData.total_tips_recieved);
+
+                                const usdValue = Number(getAmountInUSD(String(avgStrk)));
+
+                                if (usdValue >= 100) return usdValue.toFixed(0);   // No decimals for large amounts
+                                if (usdValue >= 1) return usdValue.toFixed(2);     // 2 decimals for normal amounts
+                                return usdValue.toPrecision(3);                    // 3 sig digits for small amounts
+                              })()
+                            : "0.00"
+                        }
                       </p>
+
                     </div>
                   </div>
                 </CardContent>
