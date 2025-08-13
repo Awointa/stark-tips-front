@@ -1,36 +1,85 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+StarkTips Frontend
+A decentralized tipping dApp built on Starknet, allowing users to send on-chain tips using STRK tokens. Built with Next.js, TailwindCSS, Starknet React, and integrated with the CoinGecko API for real-time price conversion.
 
-## Getting Started
+Tech Stack
+Cairo – Smart contract language for Starknet.
 
-First, run the development server:
+Starknet React – Wallet and contract integration.
 
-```bash
+Starkli – Starknet CLI for deployment & interactions.
+
+Next.js – Frontend framework.
+
+TailwindCSS – Styling.
+
+CoinGecko API – Token price conversion.
+
+Vercel – Deployment.
+
+Prerequisites
+Before you begin, ensure you have:
+
+Node.js (v18 or later)
+
+npm or yarn installed
+
+A Starknet-compatible wallet (e.g., Argent X or Braavos)
+
+Access to the deployed smart contract address
+
+Installation
+Clone the repository:
+
+bash
+Copy
+Edit
+git clone https://github.com/Awointa/stark-tips-front
+cd starktips
+Install dependencies:
+npm install
+
+
+env
+Copy
+Edit
+NEXT_PUBLIC_CONTRACT_ADDRESS= "0x030b8b082b4e8a8c289258798de1cfe3a293235cac2e1d8e5de28cdffcad4b79"
+NEXT_PUBLIC_NETWORK=testnet
+NEXT_PUBLIC_COINGECKO_API_URL=https://api.coingecko.com/api/v3
+Note: Never commit .env.local to version control.
+
+Running Locally
+Start the development server:
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+Visit http://localhost:3000 in your browser.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Deployment
+This project is optimized for deployment on Vercel.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Push your repo to GitHub.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Connect it to Vercel.
 
-## Learn More
+Add your environment variables in the Vercel dashboard.
 
-To learn more about Next.js, take a look at the following resources:
+Deploy.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Key Features
+Wallet connection with Starknet React
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Send tips using STRK tokens
 
-## Deploy on Vercel
+Multicall batching for approve + send in a single transaction
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Live USD price conversion via CoinGecko API
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Responsive UI built with TailwindCSS
+
+Development Notes
+The frontend assumes the contract is already deployed.
+
+Ensure the connected wallet has enough STRK on the selected network.
+
+For local contract testing, use Starkli or the Starknet Devnet.
+
+License
+This project is open-source under the MIT License.
