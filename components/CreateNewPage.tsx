@@ -100,7 +100,7 @@ const CreateNewPage = ({pageName, setPageName, description, setDescription, goal
                       onChange={(e) => setGoal(e.target.value)}
                     />
                     <p className="text-sm text-gray-500">
-                      Set a fundraising goal in ETH to show progress to supporters
+                      Set a fundraising goal in STRK to show progress to supporters
                     </p>
                   </div>
 
