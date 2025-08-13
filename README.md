@@ -29,19 +29,13 @@ Access to the deployed smart contract address
 
 Installation
 Clone the repository:
-
-bash
-Copy
-Edit
 git clone https://github.com/Awointa/stark-tips-front
 cd starktips
 Install dependencies:
 npm install
 
 
-env
-Copy
-Edit
+
 NEXT_PUBLIC_CONTRACT_ADDRESS= "0x030b8b082b4e8a8c289258798de1cfe3a293235cac2e1d8e5de28cdffcad4b79"
 NEXT_PUBLIC_NETWORK=testnet
 NEXT_PUBLIC_COINGECKO_API_URL=https://api.coingecko.com/api/v3
