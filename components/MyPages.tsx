@@ -49,7 +49,7 @@ const MyPages = ({tipPages, setActiveTab, shareLink}: {
             const functionName = isActive ? 'deactivate_page' : 'activate_page'
             
             // Use contract.populate to create the call with type safety
-            const call = contract.populate(functionName, [pageId])
+            const call = contract.populate(functionName, [BigInt(pageId)])
 
             // Execute the transaction
             const result = await sendAsync([call])

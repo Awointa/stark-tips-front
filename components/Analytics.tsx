@@ -29,15 +29,15 @@ interface ContractStats {
     averageTip: number;
 }
 
-interface Tip {
-    id: bigint;
-    page_id: bigint;
-    sender: string;
-    creator: string;
-    amount: bigint;
-    message: string;
-    timestamp: bigint;
-}
+// interface Tip {
+//     id: bigint;
+//     page_id: bigint;
+//     sender: string;
+//     creator: string;
+//     amount: bigint;
+//     message: string;
+//     timestamp: bigint;
+// }
 
 interface ContractTipPage {
     id: bigint;

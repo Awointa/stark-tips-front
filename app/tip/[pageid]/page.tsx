@@ -11,9 +11,7 @@ import {
   Heart,
   MessageCircle,
   Users,
-  Share2,
   Copy,
-  ExternalLink,
   Loader2,
   CheckCircle,
   AlertCircle,
@@ -27,15 +25,19 @@ import { useAccount, useReadContract, useSendTransaction, useContract } from "@s
 import { MY_CONTRACT_ABI } from "@/constants/abi/MyContract"
 import { CONTRACT_ADDRESS } from "@/constants"
 import { usePathname } from 'next/navigation'
-import { uint256, Contract } from "starknet"
+import { uint256} from "starknet"
 
-interface TipPageProps {
-  params: {
-    id: string      
-  }
-}
 
-interface Tip {
+// interface Tip {
+//   id: number | bigint
+//   // page_id: number | bigintc5 '""
+//   sender: string
+//   amount: number | bigint
+//   message: string
+//   timestamp: number | bigint
+// }
+
+interface TipUI {
   id: string
   sender: string
   amount: string
@@ -43,6 +45,7 @@ interface Tip {
   timestamp: number
   txHash?: string
 }
+
 
 interface PageData {
   created_at: number
@@ -91,7 +94,7 @@ const ERC20_ABI = [
   },
 ] as const
 
-export default function TipPage({ params }: TipPageProps) {
+export default function TipPage() {
   const pathname = usePathname()
   const id = pathname.split('/').pop()
   const { address, status } = useAccount()
@@ -107,7 +110,7 @@ export default function TipPage({ params }: TipPageProps) {
   const [userBalance, setUserBalance] = useState<string>("0")
   const [strkPrice, setStrkPrice] = useState<number>(0)
   const [isPriceLoading, setIsPriceLoading] = useState(true)
-  const [recentTips, setRecentTips] = useState<Tip[]>([])
+  const [recentTips, setRecentTips] = useState<TipUI[]>([])
   
   // Copy states for visual feedback
   const [copiedStates, setCopiedStates] = useState<{[key: string]: boolean}>({})
@@ -214,14 +217,14 @@ export default function TipPage({ params }: TipPageProps) {
   // Process tips data when tipsForPage changes
   useEffect(() => {
     if (tipsForPage && Array.isArray(tipsForPage)) {
-      const processedTips: Tip[] = tipsForPage
-        .map((tip: any) => ({
+      const processedTips: TipUI[] = tipsForPage
+        .map((tip) => ({
           id: tip.id?.toString() || Math.random().toString(),
           sender: tip.sender?.toString() || "Unknown",
           amount: weiToStrk(tip.amount?.toString() || "0"),
           message: tip.message?.toString() || "",
           timestamp: Number(tip.timestamp) * 1000, // Convert to milliseconds
-          txHash: undefined // You might want to store this in your contract
+          // txHash: undefined // You might want to store this in your contract
         }))
         .sort((a, b) => b.timestamp - a.timestamp) // Sort by most recent first
         .slice(0, 10) // Limit to 10 most recent tips
@@ -253,7 +256,7 @@ export default function TipPage({ params }: TipPageProps) {
       
       if (data.starknet && data.starknet.usd) {
         setStrkPrice(data.starknet.usd)
-        console.log('STRK price updated:', data.starknet.usd)
+        // console.log('STRK price updated:', data.starknet.usd)
       } else {
         throw new Error('Invalid price data structure')
       }
@@ -362,7 +365,7 @@ export default function TipPage({ params }: TipPageProps) {
 
   // Update pageData when contract data is available
   useEffect(() => {
-    console.log('Effect triggered - data:', data, 'contractLoading:', contractLoading, 'contractError:', contractError)
+    // console.log('Effect triggered - data:', data, 'contractLoading:', contractLoading, 'contractError:', contractError)
     
     if (contractLoading) {
       setIsLoading(true)
@@ -379,9 +382,9 @@ export default function TipPage({ params }: TipPageProps) {
 
     if (data) {
       try {
-        console.log('Processing data:', data)
+        // console.log('Processing data:', data)
         
-        let contractData: any
+        let contractData
         if (Array.isArray(data) && data.length > 0) {
           contractData = data[0]
         } else if (typeof data === 'object' && data !== null) {
@@ -494,11 +497,11 @@ export default function TipPage({ params }: TipPageProps) {
 
       const amountInWei = BigInt(strkToWei(amount))
       
-      console.log('Sending integrated tip with params:', {
-        pageId: Number(id),
-        amount: amountInWei.toString(),
-        message: message
-      })
+      // console.log('Sending integrated tip with params:', {
+      //   pageId: Number(id),
+      //   amount: amountInWei.toString(),
+      //   message: message
+      // })
 
       // Create multicall with both approval and tip sending
       const calls = []
@@ -518,7 +521,7 @@ export default function TipPage({ params }: TipPageProps) {
       ])
       calls.push(tipCall)
 
-      console.log('Integrated calls prepared:', calls)
+      // console.log('Integrated calls prepared:', calls)
 
       // Send both transactions in a single multicall
       sendTip(calls)
@@ -966,7 +969,7 @@ export default function TipPage({ params }: TipPageProps) {
                               {Number(tip.amount).toFixed(1)} STRK
                             </Badge>
                             <p className="text-xs text-gray-400">
-                              ${isPriceLoading ? "..." : getAmountInUSD(tip.amount)}
+                              ${isPriceLoading ? "..." : getAmountInUSD(String(tip.amount))}
                             </p>
                           </div>
                         </div>
@@ -974,8 +977,8 @@ export default function TipPage({ params }: TipPageProps) {
                           <p className="text-sm text-gray-700 bg-gray-50 p-2 rounded mt-2">&quot;{tip.message}&quot;</p>
                         )}
                         <div className="flex justify-between items-center mt-2">
-                          <span className="text-xs text-gray-400">{formatTimeAgo(tip.timestamp)}</span>
-                          {tip.txHash && tip.txHash !== "pending..." && (
+                          <span className="text-xs text-gray-400">{formatTimeAgo(Number(tip.timestamp))}</span>
+                          {/* {tip.txHash && tip.txHash !== "pending..." && (
                             <div className="flex items-center gap-1">
                               <Button variant="ghost" size="sm" className="h-6 px-2 text-xs">
                                 <ExternalLink className="h-3 w-3 mr-1" />
@@ -994,7 +997,7 @@ export default function TipPage({ params }: TipPageProps) {
                                 )}
                               </Button>
                             </div>
-                          )}
+                          )} */}
                         </div>
                       </div>
                     ))

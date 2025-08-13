@@ -7,16 +7,17 @@ import { Badge } from "@/components/ui/badge"
 import { CheckCircle, ExternalLink, Share2, Heart, Copy } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
-import {useSearchParams} from "next/navigation"
+import { useSearchParams } from "next/navigation"
 
 interface SuccessPageProps {
-  params: {
+  params: Promise<{
     pageId: string
-  }
+  }>
 }
 
 export default function TipSuccessPage({ params }: SuccessPageProps) {
   const [confetti, setConfetti] = useState(true)
+  const [pageId, setPageId] = useState<string>("")
   const { toast } = useToast()
 
   const searchParams = useSearchParams()
@@ -25,14 +26,19 @@ export default function TipSuccessPage({ params }: SuccessPageProps) {
   const message = searchParams.get("message") || ""
 
   useEffect(() => {
+    // Resolve the params Promise
+    params.then((resolvedParams) => {
+      setPageId(resolvedParams.pageId)
+    })
+
     // Hide confetti after animation
     const timer = setTimeout(() => setConfetti(false), 3000)
     return () => clearTimeout(timer)
-  }, [])
+  }, [params])
 
   const shareSuccess = () => {
     const text = `I just tipped ${amount} ETH to support this amazing creator! 🎉`
-    const url = `${window.location.origin}/tip/${params.pageId}`
+    const url = `${window.location.origin}/tip/${pageId}`
 
     if (navigator.share) {
       navigator.share({
@@ -145,12 +151,14 @@ export default function TipSuccessPage({ params }: SuccessPageProps) {
                 Share Your Support
               </Button>
 
-              <Link href={`/tip/${params.pageId}`}>
-                <Button variant="outline">
-                  <Heart className="h-4 w-4 mr-2" />
-                  Send Another Tip
-                </Button>
-              </Link>
+              {pageId && (
+                <Link href={`/tip/${pageId}`}>
+                  <Button variant="outline">
+                    <Heart className="h-4 w-4 mr-2" />
+                    Send Another Tip
+                  </Button>
+                </Link>
+              )}
             </div>
 
             <Link href="/">
@@ -206,4 +214,3 @@ export default function TipSuccessPage({ params }: SuccessPageProps) {
     </div>
   )
 }
-    

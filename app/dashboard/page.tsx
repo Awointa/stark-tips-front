@@ -1,8 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {Eye,TrendingUp, Users, DollarSign,  } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
@@ -41,7 +40,6 @@ export default function Dashboard() {
   const [description, setDescription] = useState("")
   const [goal, setGoal] = useState("")
   const [tipPages, setTipPages] = useState<TipPage[]>([])
-  const [isCreating, setIsCreating] = useState(false)
   const [activeTab, setActiveTab] = useState("overview")
   
   const [userPages, setUserPages] = useState<bigint[]>([])
@@ -203,73 +201,14 @@ export default function Dashboard() {
   }, [userPages, account, fetchPageDetails, totalPagesData]);
 
 
-
-  const handleCreatePage = async () => {
-    if (!pageName.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter a page name",
-        variant: "destructive",
-      })
-      return
-    }
-
-    if (!account || !contract) {
-      toast({
-        title: "Error",
-        description: "Please connect your wallet",
-        variant: "destructive",
-      })
-      return
-    }
-
-    // setIsCreating(true)
-      try {
-        // Call the contract to create a tip page
-        const result = await contract.create_tip_page(
-          account.address,
-          pageName,
-          description || "Support my work!"
-        );
-
-        // Wait for transaction to complete
-        await account.waitForTransaction(result.transaction_hash);
-
-        // Refresh the page data
-        const updatedPages = await contract.get_creator_pages(account.address);
-        setUserPages(updatedPages as bigint[]);
-
-        setPageName("")
-        setDescription("")
-        setGoal("")
-
-        toast({
-          title: "Success! 🎉",
-          description: "Your tip page has been created and is ready to receive tips",
-        })
-
-      } catch (error) {
-        console.error("Error creating tip page:", error);
-        toast({
-          title: "Error",
-          description: "Failed to create tip page. Please try again.",
-          variant: "destructive",
-        })
-      } finally {
-        setIsCreating(false)
-      }
-
-
-    }
-
-  const copyLink = (pageId: string) => {
-    const link = `${window.location.origin}/tip/${pageId}`
-    navigator.clipboard.writeText(link)
-    toast({
-      title: "Link Copied! 📋",
-      description: "Your tip page link has been copied to clipboard",
-    })
-  }
+  // const copyLink = (pageId: string) => {
+  //   const link = `${window.location.origin}/tip/${pageId}`
+  //   navigator.clipboard.writeText(link)
+  //   toast({
+  //     title: "Link Copied! 📋",
+  //     description: "Your tip page link has been copied to clipboard",
+  //   })
+  // }
 
   const shareLink = (pageId: string, pageName: string) => {
     const link = `${window.location.origin}/tip/${pageId}`
@@ -290,48 +229,11 @@ export default function Dashboard() {
     }
   }
 
-  const togglePageStatus = async (pageId: string) => {
-    if(!account || !contract) {
-      toast({
-        title: "Error",
-        description: "Please connect your wallet",
-        variant: "destructive",
-      })
-      return
-    }
-
-     try {
-      const page = tipPages.find(p => p.id === pageId);
-      
-      if (page?.isActive) {
-        await contract.deactivate_page(BigInt(pageId));
-      } else {
-        await contract.activate_page(BigInt(pageId));
-      }
-
-      // Refresh data after status change
-      fetchPageDetails(userPages);
-
-      toast({
-        title: "Page Updated",
-        description: "Page status has been changed",
-      })
-    } catch (error) {
-      console.error("Error toggling page status:", error);
-      toast({
-        title: "Error",
-        description: "Failed to update page status",
-        variant: "destructive",
-      })
-    }
-  }
-
  
     // Use contract stats for calculations
   const totalEarnings = contractStats.totalAmount;
   const totalTips = contractStats.totalTips;
   const activePagesCount = contractStats.activePagesCount;
-  // const averageTip = contractStats.averageTip;
 
 
   return (
@@ -396,7 +298,7 @@ export default function Dashboard() {
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold">{activePagesCount}</div>
-                    <p className="text-xs text-muted-foreground">Out of {/*totalPages*/} total</p>
+                    <p className="text-xs text-muted-foreground">Out of {contractStats.totalPages ? contractStats.totalPages.toString() : 0} total</p>
                   </CardContent>
                 </Card>
 
@@ -442,55 +344,30 @@ export default function Dashboard() {
                   </CardContent>
                 </Card>
               )}
-
-              {/* Recent Activity */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Recent Activity</CardTitle>
-                  <CardDescription>Your latest tips and page updates</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-4 p-3 bg-green-50 rounded-lg">
-                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">New tip received</p>
-                        <p className="text-xs text-gray-500">0.1 STRK on My Creative Journey • 2 hours ago</p>
-                      </div>
-                      <Badge variant="secondary">+0.1 STRK</Badge>
-                    </div>
-
-                    <div className="flex items-center gap-4 p-3 bg-blue-50 rounded-lg">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">Page shared</p>
-                        <p className="text-xs text-gray-500">
-                          Music Production Fund shared on social media • 5 hours ago
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-4 p-3 bg-purple-50 rounded-lg">
-                      <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">Goal milestone reached</p>
-                        <p className="text-xs text-gray-500">My Creative Journey reached 50% of goal • 1 day ago</p>
-                      </div>
-                      <Badge variant="secondary">50%</Badge>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
             </TabsContent>
 
             {/* My Pages Tab */}
-            <MyPages tipPages={tipPages} setActiveTab={setActiveTab} copyLink={copyLink} shareLink={shareLink} togglePageStatus={togglePageStatus}/>
+            <MyPages 
+              tipPages={tipPages} 
+              setActiveTab={setActiveTab} 
+              shareLink={shareLink}
+            />
 
             {/* Analytics Tab */}
-            <Analytics contractAddress={CONTRACT_ADDRESS} creatorAddress={account?.address}/>
+            <Analytics 
+              contractAddress={CONTRACT_ADDRESS} 
+              creatorAddress={account?.address}
+            />
 
             {/* Create New Tab */}
-            <CreateNewPage pageName={pageName} setPageName={setPageName} description={description} setDescription={setDescription} goal={goal} setGoal={setGoal}/>
+            <CreateNewPage 
+              pageName={pageName} 
+              setPageName={setPageName} 
+              description={description} 
+              setDescription={setDescription} 
+              goal={goal} 
+              setGoal={setGoal}
+            />
           </Tabs>
         </div>
       </div>
